@@ -1,0 +1,1 @@
+-- trip service: initial schema (define your tables here)
