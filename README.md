@@ -1,152 +1,159 @@
 # Trip Service
 
-> Service de gestion des voyages collaboratifs
+> Service de gestion des voyages collaboratifs et des profils utilisateurs
 
 ## Rôle dans l'architecture
 
 Le Trip Service est le cœur de PlanTogether. Il gère le cycle de vie complet des voyages (création, modification,
-suppression), l'administration des membres du groupe de voyage et le système d'invitations. Ce service est le point
-central d'accès pour toutes les données de voyage et coordonne les interactions avec les autres microservices.
+archivage), l'administration des membres et le système d'invitations. Il est également l'**unique propriétaire des
+profils utilisateurs** dans le système : la table `user_profile` (display_name, avatar_url, email) est hébergée
+exclusivement dans `db_trip`. Les autres microservices ne stockent que des `keycloak_id` opaques et appellent ce
+service via gRPC pour résoudre les profils.
 
 ## Fonctionnalités
 
-- Création, lecture, mise à jour et suppression de voyages (CRUD)
-- Gestion des états de voyage : PLANNING → ACTIVE → ARCHIVED
-- Gestion des membres du groupe (organizer, participants)
-- Système d'invitations avec tokens persistants
-- Gestion des images de couverture stockées dans MinIO
-- Authentification via tokens JWT Keycloak (Bearer)
-- Publication d'événements vers RabbitMQ pour les autres services
+- Création, lecture, modification et archivage de voyages (soft delete via `deleted_at`)
+- Gestion des états : PLANNING → ACTIVE → ARCHIVED
+- Gestion des membres (ORGANIZER / PARTICIPANT)
+- Système d'invitations avec tokens (lien ou QR code)
+- Propriétaire unique de `user_profile` — synchronisation lazy depuis les claims JWT
+- Exposition des profils via gRPC à tous les autres services
+- Anonymisation RGPD sur événement `user.deleted`
 
 ## Endpoints REST
 
-| Méthode | Endpoint                               | Description                                |
-|---------|----------------------------------------|--------------------------------------------|
-| POST    | `/api/trips`                           | Créer un nouveau voyage                    |
-| GET     | `/api/trips`                           | Lister tous les voyages de l'utilisateur   |
-| GET     | `/api/trips/{id}`                      | Récupérer les détails d'un voyage          |
-| PUT     | `/api/trips/{id}`                      | Mettre à jour un voyage                    |
-| DELETE  | `/api/trips/{id}`                      | Supprimer un voyage (organizer uniquement) |
-| POST    | `/api/trips/{id}/invite`               | Générer et envoyer une invitation          |
-| GET     | `/api/trips/{id}/members`              | Lister les membres du voyage               |
-| DELETE  | `/api/trips/{id}/members/{keycloakId}` | Retirer un membre                          |
-| PUT     | `/api/trips/{id}/status`               | Changer l'état du voyage                   |
+| Méthode | Endpoint | Description |
+|---------|----------|-------------|
+| GET | `/api/v1/users/me` | Profil de l'utilisateur courant (claims JWT) |
+| GET | `/api/v1/users/batch?ids=uuid1,uuid2` | Profils par IDs (batch) |
+| GET | `/api/v1/users/search?q=term` | Recherche (Keycloak Admin API) |
+| POST | `/api/v1/trips` | Créer un voyage |
+| GET | `/api/v1/trips` | Mes voyages (paginé) |
+| GET | `/api/v1/trips/{id}` | Détail d'un voyage |
+| PUT | `/api/v1/trips/{id}` | Modifier un voyage (ORGANIZER) |
+| DELETE | `/api/v1/trips/{id}` | Archiver un voyage (soft delete, ORGANIZER) |
+| POST | `/api/v1/trips/{id}/invite` | Générer un lien d'invitation |
+| POST | `/api/v1/trips/{id}/join` | Rejoindre via token |
+| GET | `/api/v1/trips/{id}/members` | Liste des membres |
+| DELETE | `/api/v1/trips/{id}/members/{uid}` | Retirer un membre (ORGANIZER) |
 
-## Modèle de données
+## gRPC Server (port 9081)
 
-**Trip**
+Le Trip Service expose un serveur gRPC consommé par tous les autres microservices :
 
-- `id` (UUID) : identifiant unique
-- `title` (String) : titre du voyage
-- `description` (String, nullable) : description
-- `cover_image_key` (String, nullable) : clé de l'image sur MinIO
-- `status` (ENUM: PLANNING, ACTIVE, ARCHIVED) : état actuel
-- `created_by` (UUID) : ID Keycloak du créateur
-- `start_date` (LocalDate, nullable)
-- `end_date` (LocalDate, nullable)
-- `created_at` (Timestamp)
-- `updated_at` (Timestamp)
+| RPC | Description |
+|-----|-------------|
+| `CheckMembership(tripId, userId)` | Vérifie l'appartenance + retourne le rôle |
+| `GetTripMembers(tripId)` | Profils complets des membres du trip |
+| `GetUserProfiles(keycloakIds[])` | Résolution batch de profils par IDs |
+| `GetTripCurrency(tripId)` | Devise de référence du trip |
 
-**TripMember**
+## Modèle de données (`db_trip`)
 
-- `trip_id` (UUID, FK)
-- `keycloak_id` (UUID) : ID Keycloak de l'utilisateur
-- `role` (ENUM: ORGANIZER, PARTICIPANT) : rôle dans le voyage
-- `joined_at` (Timestamp)
+**user_profile** — *seule copie des PII dans tout le système*
 
-**TripInvitation**
+| Colonne | Type | Description |
+|---------|------|-------------|
+| `keycloak_id` | UUID PK | Identifiant Keycloak (claim `sub`) |
+| `display_name` | VARCHAR(255) NOT NULL | Nom affiché |
+| `avatar_url` | VARCHAR(512) NULLABLE | URL de l'avatar |
+| `email` | VARCHAR(320) NOT NULL | Utilisé par Notification Service |
+| `updated_at` | TIMESTAMP NOT NULL | Dernière synchronisation |
 
-- `id` (UUID)
-- `trip_id` (UUID, FK)
-- `token` (String, unique) : token d'invitation
-- `created_by` (UUID)
-- `created_at` (Timestamp)
-- `expires_at` (Timestamp)
-- `used_by` (Set<UUID>, nullable)
+**trip**
 
-## Événements (RabbitMQ)
+| Colonne | Type | Description |
+|---------|------|-------------|
+| `id` | UUID PK | Identifiant unique (UUID v7) |
+| `title` | VARCHAR(255) NOT NULL | Nom du voyage |
+| `description` | TEXT NULLABLE | Description libre |
+| `cover_image_key` | VARCHAR(500) NULLABLE | Clé MinIO de l'image de couverture |
+| `status` | ENUM NOT NULL | PLANNING / ACTIVE / ARCHIVED |
+| `created_by` | UUID NOT NULL | keycloak_id de l'organisateur |
+| `start_date` | DATE NULLABLE | Lockée depuis Poll Service |
+| `end_date` | DATE NULLABLE | Date de fin |
+| `created_at` | TIMESTAMP NOT NULL | |
+| `updated_at` | TIMESTAMP NOT NULL | |
+| `deleted_at` | TIMESTAMP NULLABLE | Soft delete |
+
+**trip_member**
+
+| Colonne | Type | Description |
+|---------|------|-------------|
+| `id` | UUID PK | |
+| `trip_id` | UUID NOT NULL FK→trip | |
+| `keycloak_id` | UUID NOT NULL | UUID Keycloak du membre |
+| `role` | ENUM NOT NULL | ORGANIZER / PARTICIPANT |
+| `joined_at` | TIMESTAMP NOT NULL | |
+
+Index unique : `(trip_id, keycloak_id)`
+
+## Événements RabbitMQ (Exchange : `plantogether.events`)
 
 **Publie :**
 
-- `TripCreated` — Émis lors de la création d'un nouveau voyage
-- `TripUpdated` — Émis lors de la modification des données du voyage
-- `TripStatusChanged` — Émis quand le statut change (PLANNING → ACTIVE, etc.)
-- `MemberJoined` — Émis quand un nouveau membre accepte une invitation
-- `MemberRemoved` — Émis quand un membre est retiré
+| Routing Key | Déclencheur |
+|-------------|-------------|
+| `trip.created` | Création d'un voyage |
+| `trip.member.joined` | Un membre rejoint le voyage |
 
-**Consomme :** (aucun)
+**Consomme :**
+
+| Routing Key | Action |
+|-------------|--------|
+| `poll.locked` | Met à jour `start_date` / `end_date` du trip |
+| `user.profile.updated` | Synchronise `user_profile` (Keycloak SPI) |
+| `user.deleted` | Anonymise `user_profile` : display_name → « Utilisateur supprimé », email → NULL, avatar_url → NULL |
+
+## Synchronisation des profils
+
+- **Création** : à l'entrée dans un trip, les claims JWT (`sub`, `preferred_username`, `email`, `picture`) alimentent `user_profile`
+- **Mise à jour lazy** : à chaque appel API, le `display_name` du JWT est comparé avec la copie locale et mis à jour si différent
+- **Mise à jour asynchrone** : événement RabbitMQ `user.profile.updated` publié par le Keycloak SPI
 
 ## Configuration
 
 ```yaml
 server:
   port: 8081
-  servlet:
-    context-path: /
-    
+
 spring:
   application:
     name: plantogether-trip-service
+  datasource:
+    url: jdbc:postgresql://postgres:5432/db_trip
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate
-    show-sql: false
-  datasource:
-    url: jdbc:postgresql://postgres:5432/plantogether_trip
-    username: ${DB_USER}
-    password: ${DB_PASSWORD}
-  rabbitmq:
-    host: ${RABBITMQ_HOST:rabbitmq}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USER}
-    password: ${RABBITMQ_PASSWORD}
-  redis:
-    host: ${REDIS_HOST:redis}
-    port: ${REDIS_PORT:6379}
 
-keycloak:
-  serverUrl: ${KEYCLOAK_SERVER_URL:http://keycloak:8080}
-  realm: ${KEYCLOAK_REALM:plantogether}
-  clientId: ${KEYCLOAK_CLIENT_ID}
-  
-minio:
-  endpoint: ${MINIO_ENDPOINT:http://minio:9000}
-  accessKey: ${MINIO_ACCESS_KEY}
-  secretKey: ${MINIO_SECRET_KEY}
-  bucket: ${MINIO_BUCKET:plantogether}
+grpc:
+  server:
+    port: 9081
 ```
 
 ## Lancer en local
 
 ```bash
-# Prérequis : Docker Compose (infra), Java 21+, Maven 3.9+
+# Prérequis : docker compose --profile essential up -d
+# + plantogether-proto et plantogether-common installés (mvn clean install)
 
-# Option 1 : Maven
 mvn spring-boot:run
-
-# Option 2 : Docker
-docker build -t plantogether-trip-service .
-docker run -p 8081:8081 \
-  -e KEYCLOAK_SERVER_URL=http://host.docker.internal:8080 \
-  -e DB_USER=postgres \
-  -e DB_PASSWORD=postgres \
-  plantogether-trip-service
 ```
 
 ## Dépendances
 
-- **Keycloak 24+** : validation et récupération des tokens JWT OIDC
-- **PostgreSQL 16** : persistance des voyages et membres
-- **RabbitMQ** : publication d'événements pour les autres services
-- **Redis** : cache sessions
-- **MinIO** : stockage des images de couverture
-- **Spring Boot 3.3.6** : framework web
-- **Spring Cloud Netflix Eureka** : service discovery
-- **Spring Security OAuth2** : authentification par tokens porteur
+- **Keycloak 24+** : validation JWT, Admin API (recherche/résolution utilisateurs)
+- **PostgreSQL 16** (`db_trip`) : voyages, membres, profils utilisateurs
+- **RabbitMQ** : publication et consommation d'événements métier
+- **Redis** : rate limiting (Bucket4j — 100 req/min/user, 10 créations trip/heure)
+- **plantogether-proto** : contrats gRPC (serveur exposé sur 9081)
+- **plantogether-common** : DTOs events, CorsConfig, sécurité partagée
 
-## Notes de sécurité
+## Sécurité
 
-- Tous les endpoints requièrent un token Bearer valide de Keycloak
-- Seul l'organisateur peut modifier ou supprimer un voyage
-- Les UUIDs Keycloak sont les seules données utilisateur stockées (zéro PII)
-- Les images de couverture sont chiffrées dans MinIO
+- Tous les endpoints requièrent un token Bearer Keycloak valide
+- Seul l'ORGANIZER peut modifier, archiver ou retirer des membres
+- Zero PII en dehors de `user_profile` — les autres services ne stockent que des `keycloak_id`
+- Anonymisation RGPD automatique sur suppression de compte Keycloak
