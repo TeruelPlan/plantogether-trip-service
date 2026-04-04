@@ -7,6 +7,7 @@ import com.plantogether.trip.domain.Trip;
 import com.plantogether.trip.domain.TripMember;
 import com.plantogether.trip.domain.TripStatus;
 import com.plantogether.trip.domain.UserProfile;
+import com.plantogether.trip.dto.TripResponse;
 import com.plantogether.trip.repository.TripMemberRepository;
 import com.plantogether.trip.repository.TripRepository;
 import org.springframework.context.ApplicationEventPublisher;
@@ -75,5 +76,44 @@ public class TripService {
     @Transactional(readOnly = true)
     public List<Trip> listTripsForDevice(UUID deviceId) {
         return tripRepository.findAllByMemberDeviceId(deviceId);
+    }
+
+    @Transactional(readOnly = true)
+    public TripResponse getTripResponse(UUID tripId, UUID deviceId) {
+        Trip trip = tripRepository.findByIdAndDeletedAtIsNull(tripId)
+            .orElseThrow(() -> new ResourceNotFoundException("Trip not found: " + tripId));
+        tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId)
+            .orElseThrow(() -> new AccessDeniedException("Not a member of this trip"));
+        List<TripMember> members = tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId);
+        return TripResponse.from(trip, members);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TripResponse> listTripResponsesForDevice(UUID deviceId) {
+        List<Trip> trips = tripRepository.findAllByMemberDeviceId(deviceId);
+        return trips.stream().map(trip -> {
+            long memberCount = tripMemberRepository.countByTripIdAndDeletedAtIsNull(trip.getId());
+            return TripResponse.builder()
+                .id(trip.getId())
+                .title(trip.getTitle())
+                .description(trip.getDescription())
+                .status(trip.getStatus().name())
+                .referenceCurrency(trip.getReferenceCurrency())
+                .startDate(trip.getStartDate())
+                .endDate(trip.getEndDate())
+                .createdBy(trip.getCreatedBy())
+                .createdAt(trip.getCreatedAt())
+                .updatedAt(trip.getUpdatedAt())
+                .memberCount((int) memberCount)
+                .members(List.of())
+                .build();
+        }).toList();
+    }
+
+    @Transactional
+    public TripResponse createTripWithResponse(UUID deviceId, String title, String description, String currency) {
+        Trip trip = createTrip(deviceId, title, description, currency);
+        List<TripMember> members = tripMemberRepository.findByTripIdAndDeletedAtIsNull(trip.getId());
+        return TripResponse.from(trip, members);
     }
 }

@@ -1,6 +1,5 @@
 package com.plantogether.trip.controller;
 
-import com.plantogether.trip.domain.Trip;
 import com.plantogether.trip.dto.CreateTripRequest;
 import com.plantogether.trip.dto.TripResponse;
 import com.plantogether.trip.service.TripService;
@@ -33,21 +32,19 @@ public class TripController {
             Authentication authentication,
             @Valid @RequestBody CreateTripRequest request) {
         UUID deviceId = UUID.fromString(authentication.getName());
-        Trip trip = tripService.createTrip(
+        TripResponse response = tripService.createTripWithResponse(
             deviceId,
             request.getTitle(),
             request.getDescription(),
             request.getCurrency()
         );
-        return ResponseEntity.status(HttpStatus.CREATED).body(TripResponse.from(trip));
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping
     public ResponseEntity<List<TripResponse>> listMyTrips(Authentication authentication) {
         UUID deviceId = UUID.fromString(authentication.getName());
-        List<TripResponse> trips = tripService.listTripsForDevice(deviceId).stream()
-            .map(TripResponse::from)
-            .toList();
+        List<TripResponse> trips = tripService.listTripResponsesForDevice(deviceId);
         return ResponseEntity.ok(trips);
     }
 
@@ -56,7 +53,7 @@ public class TripController {
             Authentication authentication,
             @PathVariable UUID id) {
         UUID deviceId = UUID.fromString(authentication.getName());
-        Trip trip = tripService.getTrip(id, deviceId);
-        return ResponseEntity.ok(TripResponse.from(trip));
+        TripResponse response = tripService.getTripResponse(id, deviceId);
+        return ResponseEntity.ok(response);
     }
 }

@@ -7,7 +7,8 @@ import com.plantogether.trip.domain.Trip;
 import com.plantogether.trip.domain.TripMember;
 import com.plantogether.trip.domain.TripStatus;
 import com.plantogether.trip.domain.UserProfile;
-import com.plantogether.trip.event.publisher.TripEventPublisher;
+import com.plantogether.trip.dto.TripResponse;
+import org.springframework.context.ApplicationEventPublisher;
 import com.plantogether.trip.repository.TripMemberRepository;
 import com.plantogether.trip.repository.TripRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,7 +44,7 @@ class TripServiceTest {
     private UserProfileService userProfileService;
 
     @Mock
-    private TripEventPublisher eventPublisher;
+    private ApplicationEventPublisher applicationEventPublisher;
 
     @InjectMocks
     private TripService tripService;
@@ -86,7 +87,7 @@ class TripServiceTest {
         assertEquals(MemberRole.ORGANIZER, savedMember.getRole());
         assertEquals("Alice", savedMember.getDisplayName());
 
-        verify(eventPublisher).publishTripCreated(result);
+        verify(applicationEventPublisher).publishEvent(result);
     }
 
     @Test
@@ -112,7 +113,7 @@ class TripServiceTest {
             .createdAt(Instant.now()).updatedAt(Instant.now()).build();
         TripMember member = TripMember.builder().deviceId(deviceId).role(MemberRole.ORGANIZER).build();
 
-        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
         when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
             .thenReturn(Optional.of(member));
 
@@ -127,7 +128,7 @@ class TripServiceTest {
             .createdBy(UUID.randomUUID()).referenceCurrency("EUR")
             .createdAt(Instant.now()).updatedAt(Instant.now()).build();
 
-        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
         when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
             .thenReturn(Optional.empty());
 
@@ -137,7 +138,7 @@ class TripServiceTest {
     @Test
     void getTrip_notFound_throwsResourceNotFound() {
         UUID tripId = UUID.randomUUID();
-        when(tripRepository.findById(tripId)).thenReturn(Optional.empty());
+        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> tripService.getTrip(tripId, deviceId));
     }
@@ -150,5 +151,54 @@ class TripServiceTest {
         List<Trip> result = tripService.listTripsForDevice(deviceId);
         assertEquals(1, result.size());
         verify(tripRepository).findAllByMemberDeviceId(deviceId);
+    }
+
+    @Test
+    void getTripResponse_memberExists_returnsTripResponseWithMembers() {
+        UUID tripId = UUID.randomUUID();
+        Trip trip = Trip.builder().id(tripId).title("Test").status(TripStatus.PLANNING)
+            .createdBy(deviceId).referenceCurrency("EUR")
+            .createdAt(Instant.now()).updatedAt(Instant.now()).build();
+        TripMember member = TripMember.builder()
+            .deviceId(deviceId).displayName("Alice").role(MemberRole.ORGANIZER)
+            .joinedAt(Instant.now()).build();
+
+        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
+        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+            .thenReturn(Optional.of(member));
+        when(tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId))
+            .thenReturn(List.of(member));
+
+        TripResponse response = tripService.getTripResponse(tripId, deviceId);
+
+        assertEquals(tripId, response.getId());
+        assertEquals(1, response.getMemberCount());
+        assertNotNull(response.getMembers());
+        assertEquals(1, response.getMembers().size());
+        assertEquals("Alice", response.getMembers().get(0).getDisplayName());
+        assertEquals("ORGANIZER", response.getMembers().get(0).getRole());
+    }
+
+    @Test
+    void listTripResponsesForDevice_returnsMemberCount() {
+        UUID tripId = UUID.randomUUID();
+        Trip trip = Trip.builder().id(tripId).title("Test").status(TripStatus.PLANNING)
+            .createdBy(deviceId).referenceCurrency("EUR")
+            .createdAt(Instant.now()).updatedAt(Instant.now()).build();
+        TripMember member = TripMember.builder()
+            .deviceId(deviceId).displayName("Alice").role(MemberRole.ORGANIZER)
+            .joinedAt(Instant.now()).build();
+
+        when(tripRepository.findAllByMemberDeviceId(deviceId)).thenReturn(List.of(trip));
+        when(tripMemberRepository.countByTripIdAndDeletedAtIsNull(tripId))
+            .thenReturn(1L);
+
+        List<TripResponse> responses = tripService.listTripResponsesForDevice(deviceId);
+
+        assertEquals(1, responses.size());
+        assertEquals(1, responses.get(0).getMemberCount());
+        assertNotNull(responses.get(0).getMembers());
+        assertEquals(0, responses.get(0).getMembers().size());
+        assertEquals("Test", responses.get(0).getTitle());
     }
 }

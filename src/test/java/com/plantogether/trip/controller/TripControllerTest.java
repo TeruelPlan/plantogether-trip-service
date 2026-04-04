@@ -1,8 +1,8 @@
 package com.plantogether.trip.controller;
 
 import com.plantogether.common.security.SecurityAutoConfiguration;
-import com.plantogether.trip.domain.Trip;
-import com.plantogether.trip.domain.TripStatus;
+import com.plantogether.trip.dto.TripMemberResponse;
+import com.plantogether.trip.dto.TripResponse;
 import com.plantogether.trip.service.TripService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,26 +33,34 @@ class TripControllerTest {
     @MockBean
     private TripService tripService;
 
-    private Trip buildTrip(UUID deviceId) {
-        return Trip.builder()
-            .id(UUID.randomUUID())
+    private final UUID deviceId = UUID.randomUUID();
+
+    private TripResponse buildTripResponse(UUID tripId) {
+        return TripResponse.builder()
+            .id(tripId)
             .title("Beach Trip")
             .description("Fun at the beach")
-            .status(TripStatus.PLANNING)
+            .status("PLANNING")
             .createdBy(deviceId)
             .referenceCurrency("EUR")
             .createdAt(Instant.now())
             .updatedAt(Instant.now())
+            .memberCount(1)
+            .members(List.of(TripMemberResponse.builder()
+                .deviceId(deviceId)
+                .displayName("Alice")
+                .role("ORGANIZER")
+                .joinedAt(Instant.now())
+                .build()))
             .build();
     }
 
     @Test
     void postTrip_validBody_returns201() throws Exception {
-        UUID deviceId = UUID.randomUUID();
-        Trip trip = buildTrip(deviceId);
+        TripResponse response = buildTripResponse(UUID.randomUUID());
 
-        when(tripService.createTrip(any(), eq("Beach Trip"), eq("Fun at the beach"), eq("EUR")))
-            .thenReturn(trip);
+        when(tripService.createTripWithResponse(any(), eq("Beach Trip"), eq("Fun at the beach"), eq("EUR")))
+            .thenReturn(response);
 
         mockMvc.perform(post("/api/v1/trips")
                 .header("X-Device-Id", deviceId.toString())
@@ -64,13 +72,14 @@ class TripControllerTest {
             .andExpect(jsonPath("$.title").value("Beach Trip"))
             .andExpect(jsonPath("$.status").value("PLANNING"))
             .andExpect(jsonPath("$.referenceCurrency").value("EUR"))
-            .andExpect(jsonPath("$.id").exists());
+            .andExpect(jsonPath("$.id").exists())
+            .andExpect(jsonPath("$.memberCount").value(1))
+            .andExpect(jsonPath("$.members[0].displayName").value("Alice"))
+            .andExpect(jsonPath("$.members[0].role").value("ORGANIZER"));
     }
 
     @Test
     void postTrip_emptyTitle_returns400() throws Exception {
-        UUID deviceId = UUID.randomUUID();
-
         mockMvc.perform(post("/api/v1/trips")
                 .header("X-Device-Id", deviceId.toString())
                 .contentType("application/json")
@@ -82,8 +91,6 @@ class TripControllerTest {
 
     @Test
     void postTrip_missingTitle_returns400() throws Exception {
-        UUID deviceId = UUID.randomUUID();
-
         mockMvc.perform(post("/api/v1/trips")
                 .header("X-Device-Id", deviceId.toString())
                 .contentType("application/json")
@@ -95,15 +102,42 @@ class TripControllerTest {
 
     @Test
     void getTrips_returnsList() throws Exception {
-        UUID deviceId = UUID.randomUUID();
-        Trip trip = buildTrip(deviceId);
+        TripResponse response = TripResponse.builder()
+            .id(UUID.randomUUID())
+            .title("Beach Trip")
+            .status("PLANNING")
+            .referenceCurrency("EUR")
+            .createdBy(deviceId)
+            .createdAt(Instant.now())
+            .updatedAt(Instant.now())
+            .memberCount(2)
+            .build();
 
-        when(tripService.listTripsForDevice(any())).thenReturn(List.of(trip));
+        when(tripService.listTripResponsesForDevice(any())).thenReturn(List.of(response));
 
         mockMvc.perform(get("/api/v1/trips")
                 .header("X-Device-Id", deviceId.toString()))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].title").value("Beach Trip"));
+            .andExpect(jsonPath("$[0].title").value("Beach Trip"))
+            .andExpect(jsonPath("$[0].memberCount").value(2));
+    }
+
+    @Test
+    void getTrip_returnsMembersArray() throws Exception {
+        UUID tripId = UUID.randomUUID();
+        TripResponse response = buildTripResponse(tripId);
+
+        when(tripService.getTripResponse(eq(tripId), any())).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/trips/" + tripId)
+                .header("X-Device-Id", deviceId.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.title").value("Beach Trip"))
+            .andExpect(jsonPath("$.memberCount").value(1))
+            .andExpect(jsonPath("$.members").isArray())
+            .andExpect(jsonPath("$.members[0].deviceId").exists())
+            .andExpect(jsonPath("$.members[0].displayName").value("Alice"))
+            .andExpect(jsonPath("$.members[0].role").value("ORGANIZER"));
     }
 
     @Test
