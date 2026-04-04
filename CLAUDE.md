@@ -35,7 +35,7 @@ cd ../plantogether-common && mvn clean install
 
 ## Architecture
 
-Spring Boot 3.3.6 microservice (Java 21). Manages collaborative trips, members, invitations, and user profiles.
+Spring Boot 3.3.6 microservice (Java 25). Manages collaborative trips, members, invitations, and user profiles.
 
 **Ports:** REST `8081` · gRPC `9081`
 
