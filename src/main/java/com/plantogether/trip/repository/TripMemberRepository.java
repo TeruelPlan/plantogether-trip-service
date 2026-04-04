@@ -14,6 +14,4 @@ public interface TripMemberRepository extends JpaRepository<TripMember, UUID> {
     List<TripMember> findByTripIdAndDeletedAtIsNull(UUID tripId);
 
     List<TripMember> findByDeviceIdAndDeletedAtIsNull(UUID deviceId);
-
-    long countByTripIdAndDeletedAtIsNull(UUID tripId);
 }

@@ -7,17 +7,16 @@ import com.plantogether.trip.domain.Trip;
 import com.plantogether.trip.domain.TripMember;
 import com.plantogether.trip.domain.TripStatus;
 import com.plantogether.trip.domain.UserProfile;
-import com.plantogether.trip.repository.TripInvitationRepository;
+import com.plantogether.trip.event.publisher.TripEventPublisher;
 import com.plantogether.trip.repository.TripMemberRepository;
 import com.plantogether.trip.repository.TripRepository;
-import com.plantogether.trip.repository.UserProfileRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
 import java.util.List;
@@ -41,16 +40,10 @@ class TripServiceTest {
     private TripMemberRepository tripMemberRepository;
 
     @Mock
-    private TripInvitationRepository tripInvitationRepository;
-
-    @Mock
-    private UserProfileRepository userProfileRepository;
-
-    @Mock
     private UserProfileService userProfileService;
 
     @Mock
-    private ApplicationEventPublisher applicationEventPublisher;
+    private TripEventPublisher eventPublisher;
 
     @InjectMocks
     private TripService tripService;
@@ -86,8 +79,14 @@ class TripServiceTest {
         assertEquals("USD", result.getReferenceCurrency());
         assertEquals(deviceId, result.getCreatedBy());
 
-        verify(tripMemberRepository).save(any(TripMember.class));
-        verify(applicationEventPublisher).publishEvent(any(Trip.class));
+        ArgumentCaptor<TripMember> memberCaptor = ArgumentCaptor.forClass(TripMember.class);
+        verify(tripMemberRepository).save(memberCaptor.capture());
+        TripMember savedMember = memberCaptor.getValue();
+        assertEquals(deviceId, savedMember.getDeviceId());
+        assertEquals(MemberRole.ORGANIZER, savedMember.getRole());
+        assertEquals("Alice", savedMember.getDisplayName());
+
+        verify(eventPublisher).publishTripCreated(result);
     }
 
     @Test
@@ -113,7 +112,7 @@ class TripServiceTest {
             .createdAt(Instant.now()).updatedAt(Instant.now()).build();
         TripMember member = TripMember.builder().deviceId(deviceId).role(MemberRole.ORGANIZER).build();
 
-        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
         when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
             .thenReturn(Optional.of(member));
 
@@ -128,7 +127,7 @@ class TripServiceTest {
             .createdBy(UUID.randomUUID()).referenceCurrency("EUR")
             .createdAt(Instant.now()).updatedAt(Instant.now()).build();
 
-        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
         when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
             .thenReturn(Optional.empty());
 
@@ -138,7 +137,7 @@ class TripServiceTest {
     @Test
     void getTrip_notFound_throwsResourceNotFound() {
         UUID tripId = UUID.randomUUID();
-        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.empty());
+        when(tripRepository.findById(tripId)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> tripService.getTrip(tripId, deviceId));
     }

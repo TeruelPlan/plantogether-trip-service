@@ -88,15 +88,14 @@ class UserProfileServiceTest {
     }
 
     @Test
-    void updateDisplayName_noRow_createsProfileWithNewName() {
+    void updateDisplayName_noRow_throwsResourceNotFoundException() {
         when(userProfileRepository.findById(testDeviceId)).thenReturn(Optional.empty());
-        when(userProfileRepository.save(any(UserProfile.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        UserProfile result = userProfileService.updateDisplayName(testDeviceId, "New Name");
+        assertThrows(ResourceNotFoundException.class,
+            () -> userProfileService.updateDisplayName(testDeviceId, "New Name")
+        );
 
-        assertNotNull(result);
-        assertEquals("New Name", result.getDisplayName());
         verify(userProfileRepository).findById(testDeviceId);
-        verify(userProfileRepository).save(any(UserProfile.class));
+        verify(userProfileRepository, never()).save(any());
     }
 }

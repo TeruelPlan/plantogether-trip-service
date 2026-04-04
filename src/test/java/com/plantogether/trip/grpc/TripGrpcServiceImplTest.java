@@ -103,16 +103,11 @@ class TripGrpcServiceImplTest {
 
     @Test
     void getTripMembers_returnsMemberList() {
-        Trip trip = Trip.builder()
-            .id(tripId).title("Test").referenceCurrency("EUR")
-            .status(TripStatus.PLANNING).createdBy(deviceId)
-            .createdAt(Instant.now()).updatedAt(Instant.now()).build();
         TripMember m1 = TripMember.builder()
             .deviceId(deviceId).role(MemberRole.ORGANIZER).displayName("Alice").build();
         UUID device2 = UUID.randomUUID();
         TripMember m2 = TripMember.builder()
             .deviceId(device2).role(MemberRole.PARTICIPANT).displayName("Bob").build();
-        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
         when(tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId))
             .thenReturn(List.of(m1, m2));
 
@@ -136,7 +131,7 @@ class TripGrpcServiceImplTest {
             .id(tripId).title("Test").referenceCurrency("USD")
             .status(TripStatus.PLANNING).createdBy(deviceId)
             .createdAt(Instant.now()).updatedAt(Instant.now()).build();
-        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
 
         grpcService.getTripCurrency(
             GetTripCurrencyRequest.newBuilder().setTripId(tripId.toString()).build(),
