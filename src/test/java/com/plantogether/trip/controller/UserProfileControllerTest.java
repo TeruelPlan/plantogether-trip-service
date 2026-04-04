@@ -1,7 +1,7 @@
 package com.plantogether.trip.controller;
 
 import com.plantogether.trip.domain.UserProfile;
-import com.plantogether.trip.security.SecurityConfig;
+import com.plantogether.common.security.SecurityAutoConfiguration;
 import com.plantogether.trip.service.UserProfileService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(UserProfileController.class)
-@Import(SecurityConfig.class)
+@Import(SecurityAutoConfiguration.class)
 class UserProfileControllerTest {
 
     @Autowired
