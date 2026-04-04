@@ -23,7 +23,6 @@ mvn test -Dtest=ClassName
 # Docker build
 docker build -t plantogether-trip-service .
 docker run -p 8081:8081 -p 9081:9081 \
-  -e KEYCLOAK_URL=http://host.docker.internal:8180 \
   -e DB_USER=postgres -e DB_PASSWORD=postgres \
   plantogether-trip-service
 ```
@@ -46,18 +45,19 @@ Spring Boot 3.3.6 microservice (Java 21). Manages collaborative trips, members, 
 
 ```
 com.plantogether.trip/
-├── config/          # SecurityConfig, RabbitConfig, GrpcServerConfig
-├── controller/      # REST controllers
-├── domain/          # JPA entities (Trip, TripMember, TripInvitation, UserProfile)
+├── config/          # RabbitConfig, GrpcServerConfig
+├── controller/      # REST controllers (TripController, UserProfileController)
+├── domain/          # JPA entities (Trip, TripMember, UserProfile, TripStatus, MemberRole)
 ├── repository/      # Spring Data JPA
-├── service/         # Business logic
+├── service/         # Business logic (TripService, UserProfileService)
 ├── dto/             # Request/Response DTOs (Lombok @Data @Builder)
 ├── grpc/
 │   ├── server/      # TripGrpcServiceImpl (exposes gRPC on port 9081)
 │   └── client/      # (none — trip-service has no outgoing gRPC calls)
-└── event/
-    ├── publisher/   # RabbitMQ publishers
-    └── listener/    # RabbitMQ consumers (poll.locked, user.profile.updated, user.deleted)
+├── event/
+│   ├── publisher/   # RabbitMQ publishers (TripEventPublisher)
+│   └── listener/    # RabbitMQ consumers (poll.locked)
+└── exception/       # GlobalExceptionHandler (RFC 9457 ProblemDetail)
 ```
 
 ### Infrastructure dependencies
@@ -67,84 +67,71 @@ com.plantogether.trip/
 | PostgreSQL 16 | `localhost:5432/plantogether_trip` | Primary persistence |
 | RabbitMQ | `localhost:5672` | Event publishing + consuming |
 | Redis | `localhost:6379` | Rate limiting (Bucket4j) |
-| Keycloak 24+ | `localhost:8180` realm `plantogether` | JWT validation via JWKS |
 | MinIO | `localhost:9000` | Cover image storage (key only, no passthrough) |
 
+### Security model
+
+- **Anonymous device identity** — no login, no JWT, no sessions
+- `DeviceIdFilter` from `plantogether-common` (auto-configured via `SecurityAutoConfiguration`) extracts `X-Device-Id` header and sets `SecurityContext` principal
+- `authentication.getName()` returns the device UUID string in controllers
+- Public endpoints: `/actuator/health`, `/actuator/info`, `/actuator/prometheus`, `/actuator/metrics`
+- Trip-scoped authorization: membership checked via `TripMemberRepository` (ORGANIZER role for write ops)
+- **Do NOT create a SecurityConfig.java** — `SecurityAutoConfiguration` handles everything
 
 ### Domain model (db_trip)
 
-**`user_profile`** — only table in the platform that stores PII (zero PII principle: all other services store Keycloak UUIDs only):
+**`user_profile`** — lightweight profile keyed by device UUID (zero PII — no email, no real name):
 
 | Column | Type | Notes |
 |---|---|---|
-| keycloak_id | UUID | PK — Keycloak `sub` claim |
-| display_name | VARCHAR(255) | NOT NULL — from `preferred_username` or `name` |
-| avatar_url | VARCHAR(512) | NULLABLE — from `picture` claim |
-| email | VARCHAR(320) | NOT NULL — used by notification-service |
-| updated_at | TIMESTAMP | Last sync from Keycloak |
+| `device_id` | UUID | PK — client-generated device UUID |
+| `display_name` | VARCHAR(255) | NOT NULL — user-chosen display name |
+| `avatar_url` | VARCHAR(512) | NULLABLE |
+| `updated_at` | TIMESTAMPTZ | Last update timestamp |
 
-RGPD: on `user.deleted` event → `display_name = 'Utilisateur supprimé'`, `email = NULL`, `avatar_url = NULL`. `keycloak_id` retained for referential integrity.
+**`trip`** — UUID v7 id, title, description, cover_image_key, status (`PLANNING`/`ACTIVE`/`ARCHIVED`),
+created_by (device UUID), reference_currency, start_date, end_date, created_at, updated_at, deleted_at (soft delete).
 
-**`trip`** — UUID id, title, description, cover_image_key (MinIO key), status (`PLANNING`/`ACTIVE`/`ARCHIVED`),
-created_by (Keycloak UUID), start_date, end_date, created_at, updated_at, deleted_at (soft delete).
+**`trip_member`** — UUID v7 id, trip_id (FK), device_id, display_name (per-trip), role (`ORGANIZER`/`PARTICIPANT`), joined_at, deleted_at.
+Unique constraint on `(trip_id, device_id)`.
 
-**`trip_member`** — UUID id, trip_id (FK), keycloak_id, role (`ORGANIZER`/`PARTICIPANT`), joined_at.
-Unique index on (trip_id, keycloak_id).
-
-**`trip_invitation`** — UUID id, trip_id (FK), token (unique), created_by, expires_at, used_by (Set\<UUID\>).
+**`trip_invitation`** (Story 2.2) — UUID id, trip_id (FK), token (unique), created_by (device UUID), created_at.
 
 ### gRPC server (port 9081)
 
-Implements `TripGrpcService` (defined in `plantogether-proto`):
+Implements `TripService` from `plantogether-proto` (`trip_service.proto`). Manual server setup via `GrpcServerConfig` (SmartLifecycle) — no grpc-spring-boot-starter.
 
 | Method | Description |
 |---|---|
-| `CheckMembership(tripId, userId)` | Returns `{is_member, role}`. Called by all other services before any write operation. |
-| `GetTripMembers(tripId)` | Returns full `MemberProfile[]` with display_name, avatar_url, email. Used by notification-service. |
-| `GetUserProfiles(keycloakIds[])` | Bulk profile lookup. Used for enriching responses. |
+| `IsMember(tripId, deviceId)` | Returns `{is_member, role}`. Called by all other services before any trip-scoped operation. |
+| `GetTripMembers(tripId)` | Returns `TripMemberProto[]` with device_id, role, display_name. Used by notification-service. |
 | `GetTripCurrency(tripId)` | Returns the trip's reference currency. Used by expense-service. |
+| `GetTrip(tripId)` | Returns trip_id, name, organizer_device_id, member_device_ids[]. |
 
 ### REST API (`/api/v1/`)
 
 | Method | Endpoint | Auth |
 |---|---|---|
-| GET | `/api/v1/users/me` | Bearer JWT |
-| GET | `/api/v1/users/batch?ids=uuid1,uuid2` | Bearer JWT |
-| GET | `/api/v1/users/search?q=term` | Bearer JWT |
-| POST | `/api/v1/trips` | Bearer JWT |
-| GET | `/api/v1/trips` | Bearer JWT |
-| GET | `/api/v1/trips/{id}` | Bearer JWT + member |
-| PUT | `/api/v1/trips/{id}` | Bearer JWT + ORGANIZER |
-| DELETE | `/api/v1/trips/{id}` | Bearer JWT + ORGANIZER (soft delete) |
-| POST | `/api/v1/trips/{id}/invite` | Bearer JWT + ORGANIZER |
-| POST | `/api/v1/trips/{id}/join` | Bearer JWT (token in body) |
-| GET | `/api/v1/trips/{id}/members` | Bearer JWT + member |
-| DELETE | `/api/v1/trips/{id}/members/{uid}` | Bearer JWT + ORGANIZER |
+| GET | `/api/v1/users/me` | X-Device-Id |
+| PUT | `/api/v1/users/me` | X-Device-Id |
+| POST | `/api/v1/trips` | X-Device-Id |
+| GET | `/api/v1/trips` | X-Device-Id |
+| GET | `/api/v1/trips/{id}` | X-Device-Id + member |
+| PUT | `/api/v1/trips/{id}` | X-Device-Id + ORGANIZER |
+| DELETE | `/api/v1/trips/{id}` | X-Device-Id + ORGANIZER (soft delete) |
+| POST | `/api/v1/trips/{id}/invite` | X-Device-Id + ORGANIZER |
+| POST | `/api/v1/trips/{id}/join` | X-Device-Id (token in body) |
+| GET | `/api/v1/trips/{id}/members` | X-Device-Id + member |
+| DELETE | `/api/v1/trips/{id}/members/{deviceId}` | X-Device-Id + ORGANIZER |
 
 ### RabbitMQ events
 
 **Publishes** (exchange `plantogether.events`):
-- `trip.created` — on trip creation
-- `trip.member.joined` — on member joining
+- `trip.created` — `TripCreatedEvent { tripId, name, organizerDeviceId, createdAt }`
+- `trip.member.joined` — `MemberJoinedEvent { tripId, deviceId, joinedAt }`
 
 **Consumes:**
 - `poll.locked` — updates `trip.start_date` / `trip.end_date` from locked poll slot
-- `user.profile.updated` — syncs user_profile table from Keycloak SPI event
-- `user.deleted` — anonymises user_profile row (RGPD)
-
-### Security model
-
-- Stateless JWT via `KeycloakJwtConverter` — extracts `realm_access.roles` → `ROLE_<ROLE>` Spring authorities
-- Principal name = Keycloak subject UUID
-- Public: `/actuator/health`, `/actuator/info`
-- ORGANIZER role required for trip modifications and member removal
-- Zero PII in downstream services — only Keycloak UUIDs stored elsewhere
-
-### UserProfile synchronisation
-
-- **On join:** Trip Service extracts claims from JWT (`sub`, `preferred_username`, `email`, `picture`) and upserts `user_profile`
-- **Lazy update:** on each authenticated call, if `display_name` in JWT differs from stored value, update silently
-- **Async:** Keycloak SPI publishes `user.profile.updated` → consumed by Trip Service
 
 ### Environment variables
 
@@ -155,8 +142,7 @@ Implements `TripGrpcService` (defined in `plantogether-proto`):
 | `DB_PASSWORD` | `plantogether` | DB password |
 | `RABBITMQ_HOST` | `localhost` | RabbitMQ host |
 | `REDIS_HOST` | `localhost` | Redis host |
-| `KEYCLOAK_URL` | `http://localhost:8180` | Keycloak base URL |
+| `GRPC_PORT` | `9081` | gRPC server port |
 | `MINIO_ENDPOINT` | — | MinIO endpoint |
 | `MINIO_ACCESS_KEY` | — | MinIO access key |
 | `MINIO_SECRET_KEY` | — | MinIO secret key |
-

@@ -37,7 +37,7 @@ class DeviceIdFilterTest {
     void validUuidHeader_setsSecurityContext() throws Exception {
         UUID id = UUID.randomUUID();
         request.addHeader("X-Device-Id", id.toString());
-        filter.doFilterInternal(request, response, filterChain);
+        filter.doFilter(request, response, filterChain);
         assertThat(SecurityContextHolder.getContext().getAuthentication().getName())
                 .isEqualTo(id.toString());
         verify(filterChain).doFilter(request, response);
@@ -45,7 +45,7 @@ class DeviceIdFilterTest {
 
     @Test
     void missingHeader_leavesContextUnauthenticated() throws Exception {
-        filter.doFilterInternal(request, response, filterChain);
+        filter.doFilter(request, response, filterChain);
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         verify(filterChain).doFilter(request, response);
     }
@@ -53,7 +53,7 @@ class DeviceIdFilterTest {
     @Test
     void invalidUuidFormat_leavesContextUnauthenticated() throws Exception {
         request.addHeader("X-Device-Id", "not-a-uuid");
-        filter.doFilterInternal(request, response, filterChain);
+        filter.doFilter(request, response, filterChain);
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         verify(filterChain).doFilter(request, response);
     }
@@ -62,7 +62,7 @@ class DeviceIdFilterTest {
     void uuidWithWhitespace_trimmedAndAccepted() throws Exception {
         UUID id = UUID.randomUUID();
         request.addHeader("X-Device-Id", "  " + id.toString() + "  ");
-        filter.doFilterInternal(request, response, filterChain);
+        filter.doFilter(request, response, filterChain);
         assertThat(SecurityContextHolder.getContext().getAuthentication().getName())
                 .isEqualTo(id.toString());
         verify(filterChain).doFilter(request, response);
