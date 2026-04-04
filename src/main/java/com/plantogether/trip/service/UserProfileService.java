@@ -44,6 +44,7 @@ public class UserProfileService {
         UserProfile profile = userProfileRepository.findById(deviceId)
             .orElseGet(() -> UserProfile.builder()
                 .deviceId(deviceId)
+                .displayName("Guest " + deviceId.toString().substring(0, 4))
                 .avatarUrl(null)
                 .updatedAt(Instant.now())
                 .build());
