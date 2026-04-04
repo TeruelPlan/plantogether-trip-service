@@ -1,0 +1,154 @@
+package com.plantogether.trip.service;
+
+import com.plantogether.common.exception.AccessDeniedException;
+import com.plantogether.common.exception.ResourceNotFoundException;
+import com.plantogether.trip.domain.MemberRole;
+import com.plantogether.trip.domain.Trip;
+import com.plantogether.trip.domain.TripMember;
+import com.plantogether.trip.domain.TripStatus;
+import com.plantogether.trip.domain.UserProfile;
+import com.plantogether.trip.event.publisher.TripEventPublisher;
+import com.plantogether.trip.repository.TripMemberRepository;
+import com.plantogether.trip.repository.TripRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class TripServiceTest {
+
+    @Mock
+    private TripRepository tripRepository;
+
+    @Mock
+    private TripMemberRepository tripMemberRepository;
+
+    @Mock
+    private UserProfileService userProfileService;
+
+    @Mock
+    private TripEventPublisher eventPublisher;
+
+    @InjectMocks
+    private TripService tripService;
+
+    private UUID deviceId;
+    private UserProfile profile;
+
+    @BeforeEach
+    void setUp() {
+        deviceId = UUID.randomUUID();
+        profile = UserProfile.builder()
+            .deviceId(deviceId)
+            .displayName("Alice")
+            .updatedAt(Instant.now())
+            .build();
+    }
+
+    @Test
+    void createTrip_savesTrip_savesMember_publishesEvent() {
+        when(userProfileService.getOrCreateProfile(deviceId, null, null)).thenReturn(profile);
+        when(tripRepository.save(any(Trip.class))).thenAnswer(inv -> {
+            Trip t = inv.getArgument(0);
+            t.setId(UUID.randomUUID());
+            return t;
+        });
+        when(tripMemberRepository.save(any(TripMember.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Trip result = tripService.createTrip(deviceId, "Beach Trip", "Fun", "USD");
+
+        assertNotNull(result.getId());
+        assertEquals("Beach Trip", result.getTitle());
+        assertEquals(TripStatus.PLANNING, result.getStatus());
+        assertEquals("USD", result.getReferenceCurrency());
+        assertEquals(deviceId, result.getCreatedBy());
+
+        ArgumentCaptor<TripMember> memberCaptor = ArgumentCaptor.forClass(TripMember.class);
+        verify(tripMemberRepository).save(memberCaptor.capture());
+        TripMember savedMember = memberCaptor.getValue();
+        assertEquals(deviceId, savedMember.getDeviceId());
+        assertEquals(MemberRole.ORGANIZER, savedMember.getRole());
+        assertEquals("Alice", savedMember.getDisplayName());
+
+        verify(eventPublisher).publishTripCreated(result);
+    }
+
+    @Test
+    void createTrip_nullCurrency_defaultsToEUR() {
+        when(userProfileService.getOrCreateProfile(deviceId, null, null)).thenReturn(profile);
+        when(tripRepository.save(any(Trip.class))).thenAnswer(inv -> {
+            Trip t = inv.getArgument(0);
+            t.setId(UUID.randomUUID());
+            return t;
+        });
+        when(tripMemberRepository.save(any(TripMember.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Trip result = tripService.createTrip(deviceId, "Trip", null, null);
+
+        assertEquals("EUR", result.getReferenceCurrency());
+    }
+
+    @Test
+    void getTrip_memberExists_returnsTrip() {
+        UUID tripId = UUID.randomUUID();
+        Trip trip = Trip.builder().id(tripId).title("Test").status(TripStatus.PLANNING)
+            .createdBy(deviceId).referenceCurrency("EUR")
+            .createdAt(Instant.now()).updatedAt(Instant.now()).build();
+        TripMember member = TripMember.builder().deviceId(deviceId).role(MemberRole.ORGANIZER).build();
+
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+            .thenReturn(Optional.of(member));
+
+        Trip result = tripService.getTrip(tripId, deviceId);
+        assertEquals(tripId, result.getId());
+    }
+
+    @Test
+    void getTrip_notMember_throwsAccessDenied() {
+        UUID tripId = UUID.randomUUID();
+        Trip trip = Trip.builder().id(tripId).title("Test").status(TripStatus.PLANNING)
+            .createdBy(UUID.randomUUID()).referenceCurrency("EUR")
+            .createdAt(Instant.now()).updatedAt(Instant.now()).build();
+
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+            .thenReturn(Optional.empty());
+
+        assertThrows(AccessDeniedException.class, () -> tripService.getTrip(tripId, deviceId));
+    }
+
+    @Test
+    void getTrip_notFound_throwsResourceNotFound() {
+        UUID tripId = UUID.randomUUID();
+        when(tripRepository.findById(tripId)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> tripService.getTrip(tripId, deviceId));
+    }
+
+    @Test
+    void listTripsForDevice_delegatesToRepository() {
+        Trip trip = Trip.builder().id(UUID.randomUUID()).title("Test").build();
+        when(tripRepository.findAllByMemberDeviceId(deviceId)).thenReturn(List.of(trip));
+
+        List<Trip> result = tripService.listTripsForDevice(deviceId);
+        assertEquals(1, result.size());
+        verify(tripRepository).findAllByMemberDeviceId(deviceId);
+    }
+}
