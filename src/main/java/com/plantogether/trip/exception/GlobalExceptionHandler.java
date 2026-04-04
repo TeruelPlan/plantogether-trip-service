@@ -1,6 +1,7 @@
 package com.plantogether.trip.exception;
 
 import com.plantogether.common.exception.AccessDeniedException;
+import com.plantogether.common.exception.BadRequestException;
 import com.plantogether.common.exception.ErrorResponse;
 import com.plantogether.common.exception.ResourceNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,6 +32,15 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.builder()
                         .timestamp(Instant.now()).status(403)
                         .error("Forbidden").message(ex.getMessage())
+                        .path(req.getRequestURI()).build());
+    }
+
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ErrorResponse> handleBadRequest(BadRequestException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.builder()
+                        .timestamp(Instant.now()).status(400)
+                        .error("Bad Request").message(ex.getMessage())
                         .path(req.getRequestURI()).build());
     }
 

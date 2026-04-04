@@ -30,6 +30,13 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
 
+grpc:
+  server:
+    port: ${GRPC_PORT:9081}
+
+app:
+  invite-base-url: ${INVITE_BASE_URL:http://localhost}
+
 management:
   endpoints:
     web:
