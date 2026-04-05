@@ -18,8 +18,13 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import com.plantogether.common.exception.AccessDeniedException;
+import com.plantogether.trip.dto.UpdateTripRequest;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -144,5 +149,87 @@ class TripControllerTest {
     void getTrip_noDeviceId_returns401() throws Exception {
         mockMvc.perform(get("/api/v1/trips"))
             .andExpect(status().isUnauthorized());
+    }
+
+    // --- PUT /api/v1/trips/{id} ---
+
+    @Test
+    void putTrip_validBody_returns200() throws Exception {
+        UUID tripId = UUID.randomUUID();
+        TripResponse response = TripResponse.builder()
+            .id(tripId).title("Updated Title").description("New desc")
+            .status("PLANNING").referenceCurrency("USD")
+            .createdBy(deviceId).createdAt(Instant.now()).updatedAt(Instant.now())
+            .memberCount(1).members(List.of()).build();
+
+        when(tripService.updateTrip(eq(tripId), any(), any(UpdateTripRequest.class)))
+            .thenReturn(response);
+
+        mockMvc.perform(put("/api/v1/trips/" + tripId)
+                .header("X-Device-Id", deviceId.toString())
+                .contentType("application/json")
+                .content("""
+                    {"title": "Updated Title", "description": "New desc", "referenceCurrency": "USD"}
+                """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.title").value("Updated Title"))
+            .andExpect(jsonPath("$.referenceCurrency").value("USD"));
+    }
+
+    @Test
+    void putTrip_emptyTitle_returns400() throws Exception {
+        UUID tripId = UUID.randomUUID();
+        mockMvc.perform(put("/api/v1/trips/" + tripId)
+                .header("X-Device-Id", deviceId.toString())
+                .contentType("application/json")
+                .content("""
+                    {"title": ""}
+                """))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void putTrip_nonOrganizer_returns403() throws Exception {
+        UUID tripId = UUID.randomUUID();
+        when(tripService.updateTrip(eq(tripId), any(), any(UpdateTripRequest.class)))
+            .thenThrow(new AccessDeniedException("Only the organizer can perform this action"));
+
+        mockMvc.perform(put("/api/v1/trips/" + tripId)
+                .header("X-Device-Id", deviceId.toString())
+                .contentType("application/json")
+                .content("""
+                    {"title": "Hacked"}
+                """))
+            .andExpect(status().isForbidden());
+    }
+
+    // --- PATCH /api/v1/trips/{id}/archive ---
+
+    @Test
+    void patchArchive_returns200() throws Exception {
+        UUID tripId = UUID.randomUUID();
+        TripResponse response = TripResponse.builder()
+            .id(tripId).title("Trip").status("ARCHIVED")
+            .referenceCurrency("EUR").createdBy(deviceId)
+            .createdAt(Instant.now()).updatedAt(Instant.now())
+            .memberCount(1).members(List.of()).build();
+
+        when(tripService.archiveTrip(eq(tripId), any())).thenReturn(response);
+
+        mockMvc.perform(patch("/api/v1/trips/" + tripId + "/archive")
+                .header("X-Device-Id", deviceId.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("ARCHIVED"));
+    }
+
+    @Test
+    void patchArchive_nonOrganizer_returns403() throws Exception {
+        UUID tripId = UUID.randomUUID();
+        when(tripService.archiveTrip(eq(tripId), any()))
+            .thenThrow(new AccessDeniedException("Only the organizer can perform this action"));
+
+        mockMvc.perform(patch("/api/v1/trips/" + tripId + "/archive")
+                .header("X-Device-Id", deviceId.toString()))
+            .andExpect(status().isForbidden());
     }
 }

@@ -8,6 +8,7 @@ import com.plantogether.trip.domain.TripMember;
 import com.plantogether.trip.domain.TripStatus;
 import com.plantogether.trip.domain.UserProfile;
 import com.plantogether.trip.dto.TripResponse;
+import com.plantogether.trip.dto.UpdateTripRequest;
 import com.plantogether.trip.repository.TripMemberRepository;
 import com.plantogether.trip.repository.TripRepository;
 import org.springframework.context.ApplicationEventPublisher;
@@ -108,6 +109,54 @@ public class TripService {
                 .members(List.of())
                 .build();
         }).toList();
+    }
+
+    @Transactional
+    public TripResponse updateTrip(UUID tripId, UUID deviceId, UpdateTripRequest request) {
+        Trip trip = tripRepository.findByIdAndDeletedAtIsNull(tripId)
+            .orElseThrow(() -> new ResourceNotFoundException("Trip not found: " + tripId));
+        requireOrganizer(tripId, deviceId);
+
+        trip.setTitle(request.getTitle());
+        if (request.getDescription() != null) {
+            trip.setDescription(request.getDescription());
+        }
+        if (request.getReferenceCurrency() != null) {
+            trip.setReferenceCurrency(request.getReferenceCurrency());
+        }
+        trip.setUpdatedAt(Instant.now());
+        trip = tripRepository.save(trip);
+
+        List<TripMember> members = tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId);
+        return TripResponse.from(trip, members);
+    }
+
+    @Transactional
+    public TripResponse archiveTrip(UUID tripId, UUID deviceId) {
+        Trip trip = tripRepository.findByIdAndDeletedAtIsNull(tripId)
+            .orElseThrow(() -> new ResourceNotFoundException("Trip not found: " + tripId));
+        requireOrganizer(tripId, deviceId);
+
+        if (trip.getStatus() == TripStatus.ARCHIVED) {
+            throw new IllegalStateException("Trip is already archived");
+        }
+
+        trip.setStatus(TripStatus.ARCHIVED);
+        trip.setUpdatedAt(Instant.now());
+        trip = tripRepository.save(trip);
+
+        List<TripMember> members = tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId);
+        return TripResponse.from(trip, members);
+    }
+
+    private TripMember requireOrganizer(UUID tripId, UUID deviceId) {
+        TripMember member = tripMemberRepository
+            .findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId)
+            .orElseThrow(() -> new AccessDeniedException("Not a member of this trip"));
+        if (member.getRole() != MemberRole.ORGANIZER) {
+            throw new AccessDeniedException("Only the organizer can perform this action");
+        }
+        return member;
     }
 
     @Transactional
