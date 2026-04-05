@@ -44,8 +44,8 @@ public class GlobalExceptionHandler {
                         .path(req.getRequestURI()).build());
     }
 
-    @ExceptionHandler(IllegalStateException.class)
-    public ResponseEntity<ErrorResponse> handleConflict(IllegalStateException ex, HttpServletRequest req) {
+    @ExceptionHandler(TripStateException.class)
+    public ResponseEntity<ErrorResponse> handleConflict(TripStateException ex, HttpServletRequest req) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ErrorResponse.builder()
                         .timestamp(Instant.now()).status(409)

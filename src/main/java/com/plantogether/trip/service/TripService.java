@@ -6,6 +6,7 @@ import com.plantogether.trip.domain.MemberRole;
 import com.plantogether.trip.domain.Trip;
 import com.plantogether.trip.domain.TripMember;
 import com.plantogether.trip.domain.TripStatus;
+import com.plantogether.trip.exception.TripStateException;
 import com.plantogether.trip.domain.UserProfile;
 import com.plantogether.trip.dto.TripResponse;
 import com.plantogether.trip.dto.UpdateTripRequest;
@@ -117,9 +118,13 @@ public class TripService {
             .orElseThrow(() -> new ResourceNotFoundException("Trip not found: " + tripId));
         requireOrganizer(tripId, deviceId);
 
+        if (trip.getStatus() == TripStatus.ARCHIVED) {
+            throw new TripStateException("Cannot update an archived trip");
+        }
+
         trip.setTitle(request.getTitle());
         if (request.getDescription() != null) {
-            trip.setDescription(request.getDescription());
+            trip.setDescription(request.getDescription().isEmpty() ? null : request.getDescription());
         }
         if (request.getReferenceCurrency() != null) {
             trip.setReferenceCurrency(request.getReferenceCurrency());
@@ -138,7 +143,7 @@ public class TripService {
         requireOrganizer(tripId, deviceId);
 
         if (trip.getStatus() == TripStatus.ARCHIVED) {
-            throw new IllegalStateException("Trip is already archived");
+            throw new TripStateException("Trip is already archived");
         }
 
         trip.setStatus(TripStatus.ARCHIVED);

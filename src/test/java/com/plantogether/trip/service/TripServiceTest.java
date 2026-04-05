@@ -9,6 +9,7 @@ import com.plantogether.trip.domain.TripStatus;
 import com.plantogether.trip.domain.UserProfile;
 import com.plantogether.trip.dto.TripResponse;
 import com.plantogether.trip.dto.UpdateTripRequest;
+import com.plantogether.trip.exception.TripStateException;
 import org.springframework.context.ApplicationEventPublisher;
 import com.plantogether.trip.repository.TripMemberRepository;
 import com.plantogether.trip.repository.TripRepository;
@@ -294,7 +295,7 @@ class TripServiceTest {
         when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
             .thenReturn(Optional.of(member));
 
-        assertThrows(IllegalStateException.class, () -> tripService.archiveTrip(tripId, deviceId));
+        assertThrows(TripStateException.class, () -> tripService.archiveTrip(tripId, deviceId));
     }
 
     @Test
@@ -311,6 +312,23 @@ class TripServiceTest {
             .thenReturn(Optional.of(member));
 
         assertThrows(AccessDeniedException.class, () -> tripService.archiveTrip(tripId, deviceId));
+    }
+
+    @Test
+    void updateTrip_archivedTripThrowsTripStateException() {
+        UUID tripId = UUID.randomUUID();
+        Trip trip = Trip.builder().id(tripId).title("Trip").status(TripStatus.ARCHIVED)
+            .createdBy(deviceId).referenceCurrency("EUR")
+            .createdAt(Instant.now()).updatedAt(Instant.now()).build();
+        TripMember member = TripMember.builder().deviceId(deviceId).role(MemberRole.ORGANIZER)
+            .displayName("Alice").joinedAt(Instant.now()).build();
+
+        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
+        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+            .thenReturn(Optional.of(member));
+
+        UpdateTripRequest request = UpdateTripRequest.builder().title("Nope").build();
+        assertThrows(TripStateException.class, () -> tripService.updateTrip(tripId, deviceId, request));
     }
 
     @Test

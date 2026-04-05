@@ -20,6 +20,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import com.plantogether.common.exception.AccessDeniedException;
 import com.plantogether.trip.dto.UpdateTripRequest;
+import com.plantogether.trip.exception.TripStateException;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -220,6 +221,17 @@ class TripControllerTest {
                 .header("X-Device-Id", deviceId.toString()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("ARCHIVED"));
+    }
+
+    @Test
+    void patchArchive_alreadyArchived_returns409() throws Exception {
+        UUID tripId = UUID.randomUUID();
+        when(tripService.archiveTrip(eq(tripId), any()))
+            .thenThrow(new TripStateException("Trip is already archived"));
+
+        mockMvc.perform(patch("/api/v1/trips/" + tripId + "/archive")
+                .header("X-Device-Id", deviceId.toString()))
+            .andExpect(status().isConflict());
     }
 
     @Test
