@@ -44,6 +44,15 @@ public class GlobalExceptionHandler {
                         .path(req.getRequestURI()).build());
     }
 
+    @ExceptionHandler(TripStateException.class)
+    public ResponseEntity<ErrorResponse> handleConflict(TripStateException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ErrorResponse.builder()
+                        .timestamp(Instant.now()).status(409)
+                        .error("Conflict").message(ex.getMessage())
+                        .path(req.getRequestURI()).build());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest req) {
         String msg = ex.getBindingResult().getFieldErrors().stream()
