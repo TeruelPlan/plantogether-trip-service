@@ -1,17 +1,22 @@
 package com.plantogether.trip.service;
 
 import com.plantogether.common.exception.AccessDeniedException;
+import com.plantogether.common.exception.BadRequestException;
 import com.plantogether.common.exception.ResourceNotFoundException;
 import com.plantogether.trip.domain.MemberRole;
 import com.plantogether.trip.domain.Trip;
+import com.plantogether.trip.domain.TripInvitation;
 import com.plantogether.trip.domain.TripMember;
 import com.plantogether.trip.domain.TripStatus;
 import com.plantogether.trip.exception.TripStateException;
 import com.plantogether.trip.domain.UserProfile;
+import com.plantogether.trip.dto.TripPreviewResponse;
 import com.plantogether.trip.dto.TripResponse;
 import com.plantogether.trip.dto.UpdateTripRequest;
+import com.plantogether.trip.repository.TripInvitationRepository;
 import com.plantogether.trip.repository.TripMemberRepository;
 import com.plantogether.trip.repository.TripRepository;
+import com.plantogether.trip.repository.UserProfileRepository;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,18 +30,26 @@ public class TripService {
 
     private final TripRepository tripRepository;
     private final TripMemberRepository tripMemberRepository;
+    private final TripInvitationRepository tripInvitationRepository;
+    private final UserProfileRepository userProfileRepository;
     private final UserProfileService userProfileService;
     private final ApplicationEventPublisher applicationEventPublisher;
 
     public TripService(TripRepository tripRepository,
                        TripMemberRepository tripMemberRepository,
+                       TripInvitationRepository tripInvitationRepository,
+                       UserProfileRepository userProfileRepository,
                        UserProfileService userProfileService,
                        ApplicationEventPublisher applicationEventPublisher) {
         this.tripRepository = tripRepository;
         this.tripMemberRepository = tripMemberRepository;
+        this.tripInvitationRepository = tripInvitationRepository;
+        this.userProfileRepository = userProfileRepository;
         this.userProfileService = userProfileService;
         this.applicationEventPublisher = applicationEventPublisher;
     }
+
+    public record MemberJoinedInternalEvent(UUID tripId, UUID deviceId, Instant joinedAt) {}
 
     @Transactional
     public Trip createTrip(UUID deviceId, String title, String description, String currency) {
@@ -152,6 +165,73 @@ public class TripService {
 
         List<TripMember> members = tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId);
         return TripResponse.from(trip, members);
+    }
+
+    @Transactional
+    public Trip joinTrip(UUID tripId, UUID token, UUID deviceId) {
+        TripInvitation invitation = tripInvitationRepository.findByToken(token)
+            .orElseThrow(() -> new ResourceNotFoundException("Invitation not found"));
+
+        if (!invitation.getTrip().getId().equals(tripId)) {
+            throw new BadRequestException("Token does not match this trip");
+        }
+
+        if (invitation.getTrip().getDeletedAt() != null) {
+            throw new ResourceNotFoundException("Trip no longer exists: " + tripId);
+        }
+
+        if (tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId).isPresent()) {
+            return invitation.getTrip();
+        }
+
+        UserProfile profile = userProfileRepository.findById(deviceId)
+            .orElseThrow(() -> new BadRequestException("Display name required"));
+
+        if (profile.getDisplayName() == null) {
+            throw new BadRequestException("Display name required");
+        }
+
+        TripMember member = TripMember.builder()
+            .trip(invitation.getTrip())
+            .deviceId(deviceId)
+            .displayName(profile.getDisplayName())
+            .role(MemberRole.PARTICIPANT)
+            .joinedAt(Instant.now())
+            .build();
+        tripMemberRepository.save(member);
+
+        applicationEventPublisher.publishEvent(
+            new MemberJoinedInternalEvent(tripId, deviceId, member.getJoinedAt()));
+
+        return invitation.getTrip();
+    }
+
+    @Transactional(readOnly = true)
+    public TripPreviewResponse getTripPreview(UUID tripId, UUID token, UUID deviceId) {
+        TripInvitation invitation = tripInvitationRepository.findByToken(token)
+            .orElseThrow(() -> new ResourceNotFoundException("Invitation not found"));
+
+        if (!invitation.getTrip().getId().equals(tripId)) {
+            throw new ResourceNotFoundException("Invitation not found");
+        }
+
+        Trip trip = invitation.getTrip();
+        if (trip.getDeletedAt() != null) {
+            throw new ResourceNotFoundException("Trip no longer exists: " + tripId);
+        }
+        long memberCount = tripMemberRepository.countByTripIdAndDeletedAtIsNull(tripId);
+        boolean isMember = tripMemberRepository
+            .findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId)
+            .isPresent();
+
+        return TripPreviewResponse.builder()
+            .id(trip.getId())
+            .title(trip.getTitle())
+            .description(trip.getDescription())
+            .coverImageKey(trip.getCoverImageKey())
+            .memberCount(memberCount)
+            .isMember(isMember)
+            .build();
     }
 
     private TripMember requireOrganizer(UUID tripId, UUID deviceId) {
