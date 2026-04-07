@@ -12,6 +12,7 @@ public class RabbitConfig {
 
     public static final String EXCHANGE = "plantogether.events";
     public static final String ROUTING_KEY_TRIP_CREATED = "trip.created";
+    public static final String ROUTING_KEY_MEMBER_JOINED = "trip.member.joined";
 
     @Bean
     public TopicExchange plantogetherExchange() {

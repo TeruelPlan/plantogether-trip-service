@@ -1,5 +1,6 @@
 package com.plantogether.trip.service;
 
+import com.plantogether.common.exception.ResourceNotFoundException;
 import com.plantogether.trip.domain.UserProfile;
 import com.plantogether.trip.repository.UserProfileRepository;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -42,12 +43,7 @@ public class UserProfileService {
     @Transactional
     public UserProfile updateDisplayName(UUID deviceId, String newDisplayName) {
         UserProfile profile = userProfileRepository.findById(deviceId)
-            .orElseGet(() -> UserProfile.builder()
-                .deviceId(deviceId)
-                .displayName("Guest " + deviceId.toString().substring(0, 4))
-                .avatarUrl(null)
-                .updatedAt(Instant.now())
-                .build());
+            .orElseThrow(() -> new ResourceNotFoundException("Profile not found: " + deviceId));
         profile.setDisplayName(newDisplayName);
         profile.setUpdatedAt(Instant.now());
         return userProfileRepository.save(profile);

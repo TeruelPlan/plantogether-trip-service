@@ -3,6 +3,7 @@ package com.plantogether.trip.controller;
 import com.plantogether.common.security.SecurityAutoConfiguration;
 import com.plantogether.trip.dto.TripMemberResponse;
 import com.plantogether.trip.dto.TripResponse;
+import com.plantogether.trip.service.InvitationService;
 import com.plantogether.trip.service.TripService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +39,9 @@ class TripControllerTest {
 
     @MockBean
     private TripService tripService;
+
+    @MockBean
+    private InvitationService invitationService;
 
     private final UUID deviceId = UUID.randomUUID();
 
