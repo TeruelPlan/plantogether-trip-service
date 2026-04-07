@@ -10,6 +10,7 @@ import com.plantogether.trip.domain.TripMember;
 import com.plantogether.trip.domain.TripStatus;
 import com.plantogether.trip.exception.TripStateException;
 import com.plantogether.trip.domain.UserProfile;
+import com.plantogether.trip.dto.TripMemberResponse;
 import com.plantogether.trip.dto.TripPreviewResponse;
 import com.plantogether.trip.dto.TripResponse;
 import com.plantogether.trip.dto.UpdateTripRequest;
@@ -232,6 +233,31 @@ public class TripService {
             .memberCount(memberCount)
             .isMember(isMember)
             .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<TripMemberResponse> getTripMembers(UUID tripId, UUID deviceId) {
+        tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId)
+            .orElseThrow(() -> new AccessDeniedException("Not a member of this trip"));
+        return tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId).stream()
+            .map(TripMemberResponse::from)
+            .toList();
+    }
+
+    @Transactional
+    public void removeMember(UUID tripId, UUID callerDeviceId, UUID targetDeviceId) {
+        requireOrganizer(tripId, callerDeviceId);
+        if (callerDeviceId.equals(targetDeviceId)) {
+            throw new BadRequestException("Organizer cannot remove themselves");
+        }
+        TripMember target = tripMemberRepository
+            .findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, targetDeviceId)
+            .orElseThrow(() -> new ResourceNotFoundException("Member not found"));
+        if (target.getRole() == MemberRole.ORGANIZER) {
+            throw new BadRequestException("Cannot remove another organizer");
+        }
+        target.setDeletedAt(Instant.now());
+        tripMemberRepository.save(target);
     }
 
     private TripMember requireOrganizer(UUID tripId, UUID deviceId) {

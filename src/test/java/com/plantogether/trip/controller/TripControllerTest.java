@@ -18,11 +18,15 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import com.plantogether.common.exception.AccessDeniedException;
+import com.plantogether.common.exception.BadRequestException;
 import com.plantogether.trip.dto.UpdateTripRequest;
 import com.plantogether.trip.exception.TripStateException;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -247,5 +251,63 @@ class TripControllerTest {
         mockMvc.perform(patch("/api/v1/trips/" + tripId + "/archive")
                 .header("X-Device-Id", deviceId.toString()))
             .andExpect(status().isForbidden());
+    }
+
+    // --- GET /api/v1/trips/{id}/members ---
+
+    @Test
+    void getMembers_memberCaller_returns200WithList() throws Exception {
+        UUID tripId = UUID.randomUUID();
+        List<TripMemberResponse> members = List.of(
+            TripMemberResponse.builder()
+                .deviceId(deviceId).displayName("Alice").role("ORGANIZER").joinedAt(Instant.now()).build()
+        );
+
+        when(tripService.getTripMembers(eq(tripId), any())).thenReturn(members);
+
+        mockMvc.perform(get("/api/v1/trips/" + tripId + "/members")
+                .header("X-Device-Id", deviceId.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].displayName").value("Alice"))
+            .andExpect(jsonPath("$[0].role").value("ORGANIZER"));
+    }
+
+    // --- DELETE /api/v1/trips/{id}/members/{deviceId} ---
+
+    @Test
+    void deleteMember_organizerRemovesParticipant_returns204() throws Exception {
+        UUID tripId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+
+        doNothing().when(tripService).removeMember(eq(tripId), any(), eq(targetId));
+
+        mockMvc.perform(delete("/api/v1/trips/" + tripId + "/members/" + targetId)
+                .header("X-Device-Id", deviceId.toString()))
+            .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void deleteMember_participant_returns403() throws Exception {
+        UUID tripId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+
+        doThrow(new AccessDeniedException("Only the organizer can perform this action"))
+            .when(tripService).removeMember(eq(tripId), any(), eq(targetId));
+
+        mockMvc.perform(delete("/api/v1/trips/" + tripId + "/members/" + targetId)
+                .header("X-Device-Id", deviceId.toString()))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void deleteMember_selfRemoval_returns400() throws Exception {
+        UUID tripId = UUID.randomUUID();
+
+        doThrow(new BadRequestException("Organizer cannot remove themselves"))
+            .when(tripService).removeMember(eq(tripId), any(), any());
+
+        mockMvc.perform(delete("/api/v1/trips/" + tripId + "/members/" + deviceId)
+                .header("X-Device-Id", deviceId.toString()))
+            .andExpect(status().isBadRequest());
     }
 }

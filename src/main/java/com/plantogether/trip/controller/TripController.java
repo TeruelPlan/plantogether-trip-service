@@ -4,6 +4,7 @@ import com.plantogether.trip.domain.Trip;
 import com.plantogether.trip.dto.CreateTripRequest;
 import com.plantogether.trip.dto.JoinTripRequest;
 import com.plantogether.trip.dto.TripInvitationResponse;
+import com.plantogether.trip.dto.TripMemberResponse;
 import com.plantogether.trip.dto.TripPreviewResponse;
 import com.plantogether.trip.dto.TripResponse;
 import com.plantogether.trip.dto.UpdateTripRequest;
@@ -13,6 +14,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -104,6 +106,25 @@ public class TripController {
         UUID deviceId = UUID.fromString(authentication.getName());
         TripPreviewResponse response = tripService.getTripPreview(id, token, deviceId);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{id}/members")
+    public ResponseEntity<List<TripMemberResponse>> getMembers(
+            Authentication authentication,
+            @PathVariable UUID id) {
+        UUID deviceId = UUID.fromString(authentication.getName());
+        List<TripMemberResponse> members = tripService.getTripMembers(id, deviceId);
+        return ResponseEntity.ok(members);
+    }
+
+    @DeleteMapping("/{id}/members/{deviceId}")
+    public ResponseEntity<Void> removeMember(
+            Authentication authentication,
+            @PathVariable UUID id,
+            @PathVariable("deviceId") UUID targetDeviceId) {
+        UUID callerDeviceId = UUID.fromString(authentication.getName());
+        tripService.removeMember(id, callerDeviceId, targetDeviceId);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/join")
