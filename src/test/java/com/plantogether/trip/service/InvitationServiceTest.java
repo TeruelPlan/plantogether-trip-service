@@ -2,11 +2,7 @@ package com.plantogether.trip.service;
 
 import com.plantogether.common.exception.AccessDeniedException;
 import com.plantogether.common.exception.ResourceNotFoundException;
-import com.plantogether.trip.domain.MemberRole;
-import com.plantogether.trip.domain.Trip;
-import com.plantogether.trip.domain.TripInvitation;
-import com.plantogether.trip.domain.TripMember;
-import com.plantogether.trip.domain.TripStatus;
+import com.plantogether.trip.domain.*;
 import com.plantogether.trip.dto.TripInvitationResponse;
 import com.plantogether.trip.repository.TripInvitationRepository;
 import com.plantogether.trip.repository.TripMemberRepository;
@@ -21,14 +17,9 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class InvitationServiceTest {
@@ -51,27 +42,27 @@ class InvitationServiceTest {
     @BeforeEach
     void setUp() {
         invitationService = new InvitationService(
-            tripRepository, tripMemberRepository, tripInvitationRepository, "http://localhost");
+                tripRepository, tripMemberRepository, tripInvitationRepository, "http://localhost");
         tripId = UUID.randomUUID();
         deviceId = UUID.randomUUID();
         trip = Trip.builder()
-            .id(tripId).title("Test Trip").status(TripStatus.PLANNING)
-            .createdBy(deviceId).referenceCurrency("EUR")
-            .createdAt(Instant.now()).updatedAt(Instant.now())
-            .build();
+                .id(tripId).title("Test Trip").status(TripStatus.PLANNING)
+                .createdBy(deviceId).referenceCurrency("EUR")
+                .createdAt(Instant.now()).updatedAt(Instant.now())
+                .build();
     }
 
     @Test
     void getOrCreateInvitation_createsNewInvitation() {
         TripMember organizer = TripMember.builder()
-            .deviceId(deviceId).role(MemberRole.ORGANIZER).build();
+                .deviceId(deviceId).role(MemberRole.ORGANIZER).build();
 
         when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
         when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-            .thenReturn(Optional.of(organizer));
+                .thenReturn(Optional.of(organizer));
         when(tripInvitationRepository.findByTripId(tripId)).thenReturn(Optional.empty());
         when(tripInvitationRepository.save(any(TripInvitation.class)))
-            .thenAnswer(inv -> inv.getArgument(0));
+                .thenAnswer(inv -> inv.getArgument(0));
 
         TripInvitationResponse response = invitationService.getOrCreateInvitation(tripId, deviceId);
 
@@ -84,13 +75,13 @@ class InvitationServiceTest {
     void getOrCreateInvitation_reusesExistingToken() {
         UUID existingToken = UUID.randomUUID();
         TripMember organizer = TripMember.builder()
-            .deviceId(deviceId).role(MemberRole.ORGANIZER).build();
+                .deviceId(deviceId).role(MemberRole.ORGANIZER).build();
         TripInvitation existing = TripInvitation.builder()
-            .trip(trip).token(existingToken).createdBy(deviceId).createdAt(Instant.now()).build();
+                .trip(trip).token(existingToken).createdBy(deviceId).createdAt(Instant.now()).build();
 
         when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
         when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-            .thenReturn(Optional.of(organizer));
+                .thenReturn(Optional.of(organizer));
         when(tripInvitationRepository.findByTripId(tripId)).thenReturn(Optional.of(existing));
 
         TripInvitationResponse response = invitationService.getOrCreateInvitation(tripId, deviceId);
@@ -102,24 +93,24 @@ class InvitationServiceTest {
     @Test
     void getOrCreateInvitation_nonOrganizer_throwsForbidden() {
         TripMember participant = TripMember.builder()
-            .deviceId(deviceId).role(MemberRole.PARTICIPANT).build();
+                .deviceId(deviceId).role(MemberRole.PARTICIPANT).build();
 
         when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
         when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-            .thenReturn(Optional.of(participant));
+                .thenReturn(Optional.of(participant));
 
         assertThrows(AccessDeniedException.class,
-            () -> invitationService.getOrCreateInvitation(tripId, deviceId));
+                () -> invitationService.getOrCreateInvitation(tripId, deviceId));
     }
 
     @Test
     void getOrCreateInvitation_nonMember_throwsForbidden() {
         when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
         when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-            .thenReturn(Optional.empty());
+                .thenReturn(Optional.empty());
 
         assertThrows(AccessDeniedException.class,
-            () -> invitationService.getOrCreateInvitation(tripId, deviceId));
+                () -> invitationService.getOrCreateInvitation(tripId, deviceId));
     }
 
     @Test
@@ -127,6 +118,6 @@ class InvitationServiceTest {
         when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class,
-            () -> invitationService.getOrCreateInvitation(tripId, deviceId));
+                () -> invitationService.getOrCreateInvitation(tripId, deviceId));
     }
 }

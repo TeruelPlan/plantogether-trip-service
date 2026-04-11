@@ -48,16 +48,16 @@ class TripControllerInvitationTest {
         UUID token = UUID.randomUUID();
 
         when(invitationService.getOrCreateInvitation(eq(tripId), any()))
-            .thenReturn(TripInvitationResponse.builder()
-                .inviteUrl("http://localhost/trips/" + tripId + "/join?token=" + token)
-                .token(token.toString())
-                .build());
+                .thenReturn(TripInvitationResponse.builder()
+                        .inviteUrl("http://localhost/trips/" + tripId + "/join?token=" + token)
+                        .token(token.toString())
+                        .build());
 
         mockMvc.perform(get("/api/v1/trips/{id}/invitation", tripId)
-                .header("X-Device-Id", deviceId.toString()))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.token").value(token.toString()))
-            .andExpect(jsonPath("$.inviteUrl").isNotEmpty());
+                        .header("X-Device-Id", deviceId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").value(token.toString()))
+                .andExpect(jsonPath("$.inviteUrl").isNotEmpty());
     }
 
     @Test
@@ -66,11 +66,11 @@ class TripControllerInvitationTest {
         UUID tripId = UUID.randomUUID();
 
         when(invitationService.getOrCreateInvitation(eq(tripId), any()))
-            .thenThrow(new AccessDeniedException("Only the organizer can generate invitations"));
+                .thenThrow(new AccessDeniedException("Only the organizer can generate invitations"));
 
         mockMvc.perform(get("/api/v1/trips/{id}/invitation", tripId)
-                .header("X-Device-Id", deviceId.toString()))
-            .andExpect(status().isForbidden());
+                        .header("X-Device-Id", deviceId.toString()))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -80,17 +80,17 @@ class TripControllerInvitationTest {
         UUID token = UUID.randomUUID();
 
         when(tripService.getTripPreview(eq(tripId), eq(token), any()))
-            .thenReturn(TripPreviewResponse.builder()
-                .id(tripId).title("Beach Trip").memberCount(3).isMember(false)
-                .build());
+                .thenReturn(TripPreviewResponse.builder()
+                        .id(tripId).title("Beach Trip").memberCount(3).isMember(false)
+                        .build());
 
         mockMvc.perform(get("/api/v1/trips/{id}/preview", tripId)
-                .header("X-Device-Id", deviceId.toString())
-                .param("token", token.toString()))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.title").value("Beach Trip"))
-            .andExpect(jsonPath("$.memberCount").value(3))
-            .andExpect(jsonPath("$.isMember").value(false));
+                        .header("X-Device-Id", deviceId.toString())
+                        .param("token", token.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Beach Trip"))
+                .andExpect(jsonPath("$.memberCount").value(3))
+                .andExpect(jsonPath("$.isMember").value(false));
     }
 
     @Test
@@ -100,12 +100,12 @@ class TripControllerInvitationTest {
         UUID token = UUID.randomUUID();
 
         when(tripService.getTripPreview(eq(tripId), eq(token), any()))
-            .thenThrow(new ResourceNotFoundException("Invitation not found"));
+                .thenThrow(new ResourceNotFoundException("Invitation not found"));
 
         mockMvc.perform(get("/api/v1/trips/{id}/preview", tripId)
-                .header("X-Device-Id", deviceId.toString())
-                .param("token", token.toString()))
-            .andExpect(status().isNotFound());
+                        .header("X-Device-Id", deviceId.toString())
+                        .param("token", token.toString()))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -115,19 +115,19 @@ class TripControllerInvitationTest {
         UUID token = UUID.randomUUID();
 
         Trip trip = Trip.builder()
-            .id(tripId).title("Beach Trip").status(TripStatus.PLANNING)
-            .createdBy(UUID.randomUUID()).referenceCurrency("EUR")
-            .createdAt(Instant.now()).updatedAt(Instant.now())
-            .build();
+                .id(tripId).title("Beach Trip").status(TripStatus.PLANNING)
+                .createdBy(UUID.randomUUID()).referenceCurrency("EUR")
+                .createdAt(Instant.now()).updatedAt(Instant.now())
+                .build();
 
         when(tripService.joinTrip(eq(tripId), eq(token), any())).thenReturn(trip);
 
         mockMvc.perform(post("/api/v1/trips/{id}/join", tripId)
-                .header("X-Device-Id", deviceId.toString())
-                .contentType("application/json")
-                .content("{\"token\": \"" + token + "\"}"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.title").value("Beach Trip"));
+                        .header("X-Device-Id", deviceId.toString())
+                        .contentType("application/json")
+                        .content("{\"token\": \"" + token + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Beach Trip"));
     }
 
     @Test
@@ -137,13 +137,13 @@ class TripControllerInvitationTest {
         UUID token = UUID.randomUUID();
 
         when(tripService.joinTrip(eq(tripId), eq(token), any()))
-            .thenThrow(new ResourceNotFoundException("Invitation not found"));
+                .thenThrow(new ResourceNotFoundException("Invitation not found"));
 
         mockMvc.perform(post("/api/v1/trips/{id}/join", tripId)
-                .header("X-Device-Id", deviceId.toString())
-                .contentType("application/json")
-                .content("{\"token\": \"" + token + "\"}"))
-            .andExpect(status().isNotFound());
+                        .header("X-Device-Id", deviceId.toString())
+                        .contentType("application/json")
+                        .content("{\"token\": \"" + token + "\"}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -153,13 +153,13 @@ class TripControllerInvitationTest {
         UUID token = UUID.randomUUID();
 
         when(tripService.joinTrip(eq(tripId), eq(token), any()))
-            .thenThrow(new BadRequestException("Token does not match this trip"));
+                .thenThrow(new BadRequestException("Token does not match this trip"));
 
         mockMvc.perform(post("/api/v1/trips/{id}/join", tripId)
-                .header("X-Device-Id", deviceId.toString())
-                .contentType("application/json")
-                .content("{\"token\": \"" + token + "\"}"))
-            .andExpect(status().isBadRequest());
+                        .header("X-Device-Id", deviceId.toString())
+                        .contentType("application/json")
+                        .content("{\"token\": \"" + token + "\"}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -169,12 +169,12 @@ class TripControllerInvitationTest {
         UUID token = UUID.randomUUID();
 
         when(tripService.joinTrip(eq(tripId), eq(token), any()))
-            .thenThrow(new BadRequestException("Display name required"));
+                .thenThrow(new BadRequestException("Display name required"));
 
         mockMvc.perform(post("/api/v1/trips/{id}/join", tripId)
-                .header("X-Device-Id", deviceId.toString())
-                .contentType("application/json")
-                .content("{\"token\": \"" + token + "\"}"))
-            .andExpect(status().isBadRequest());
+                        .header("X-Device-Id", deviceId.toString())
+                        .contentType("application/json")
+                        .content("{\"token\": \"" + token + "\"}"))
+                .andExpect(status().isBadRequest());
     }
 }

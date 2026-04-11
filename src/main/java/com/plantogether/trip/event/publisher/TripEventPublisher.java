@@ -22,29 +22,29 @@ public class TripEventPublisher {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void publishTripCreated(Trip trip) {
         TripCreatedEvent event = TripCreatedEvent.builder()
-            .tripId(trip.getId())
-            .name(trip.getTitle())
-            .organizerDeviceId(trip.getCreatedBy().toString())
-            .createdAt(trip.getCreatedAt())
-            .build();
+                .tripId(trip.getId())
+                .name(trip.getTitle())
+                .organizerDeviceId(trip.getCreatedBy().toString())
+                .createdAt(trip.getCreatedAt())
+                .build();
         rabbitTemplate.convertAndSend(
-            RabbitConfig.EXCHANGE,
-            RabbitConfig.ROUTING_KEY_TRIP_CREATED,
-            event
+                RabbitConfig.EXCHANGE,
+                RabbitConfig.ROUTING_KEY_TRIP_CREATED,
+                event
         );
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void publishMemberJoined(MemberJoinedInternalEvent internalEvent) {
         MemberJoinedEvent event = MemberJoinedEvent.builder()
-            .tripId(internalEvent.tripId())
-            .deviceId(internalEvent.deviceId().toString())
-            .joinedAt(internalEvent.joinedAt())
-            .build();
+                .tripId(internalEvent.tripId())
+                .deviceId(internalEvent.deviceId().toString())
+                .joinedAt(internalEvent.joinedAt())
+                .build();
         rabbitTemplate.convertAndSend(
-            RabbitConfig.EXCHANGE,
-            RabbitConfig.ROUTING_KEY_MEMBER_JOINED,
-            event
+                RabbitConfig.EXCHANGE,
+                RabbitConfig.ROUTING_KEY_MEMBER_JOINED,
+                event
         );
     }
 }

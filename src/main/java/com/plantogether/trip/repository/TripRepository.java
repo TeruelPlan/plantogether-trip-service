@@ -14,12 +14,12 @@ public interface TripRepository extends JpaRepository<Trip, UUID> {
     Optional<Trip> findByIdAndDeletedAtIsNull(UUID id);
 
     @Query("""
-        SELECT DISTINCT t FROM Trip t
-        JOIN t.members m
-        WHERE m.deviceId = :deviceId
-        AND m.deletedAt IS NULL
-        AND t.deletedAt IS NULL
-        ORDER BY t.createdAt DESC
-    """)
+                SELECT DISTINCT t FROM Trip t
+                JOIN t.members m
+                WHERE m.deviceId = :deviceId
+                AND m.deletedAt IS NULL
+                AND t.deletedAt IS NULL
+                ORDER BY t.createdAt DESC
+            """)
     List<Trip> findAllByMemberDeviceId(@Param("deviceId") UUID deviceId);
 }

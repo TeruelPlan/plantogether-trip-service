@@ -21,10 +21,10 @@ public class TripMemberResponse {
 
     public static TripMemberResponse from(TripMember member) {
         return TripMemberResponse.builder()
-            .deviceId(member.getDeviceId())
-            .displayName(member.getDisplayName())
-            .role(member.getRole().name())
-            .joinedAt(member.getJoinedAt())
-            .build();
+                .deviceId(member.getDeviceId())
+                .displayName(member.getDisplayName())
+                .role(member.getRole().name())
+                .joinedAt(member.getJoinedAt())
+                .build();
     }
 }

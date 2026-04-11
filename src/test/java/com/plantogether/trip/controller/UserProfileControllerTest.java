@@ -1,7 +1,7 @@
 package com.plantogether.trip.controller;
 
-import com.plantogether.trip.domain.UserProfile;
 import com.plantogether.common.security.SecurityAutoConfiguration;
+import com.plantogether.trip.domain.UserProfile;
 import com.plantogether.trip.service.UserProfileService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,38 +34,38 @@ class UserProfileControllerTest {
     void getMyProfile_withDeviceId_returns200() throws Exception {
         UUID deviceId = UUID.randomUUID();
         UserProfile profile = UserProfile.builder()
-            .deviceId(deviceId)
-            .displayName("Guest abc1")
-            .avatarUrl(null)
-            .updatedAt(Instant.now())
-            .build();
+                .deviceId(deviceId)
+                .displayName("Guest abc1")
+                .avatarUrl(null)
+                .updatedAt(Instant.now())
+                .build();
 
         when(userProfileService.getOrCreateProfile(any(), any(), any())).thenReturn(profile);
 
         mockMvc.perform(get("/api/v1/users/me")
-                .header("X-Device-Id", deviceId.toString()))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.displayName").value("Guest abc1"))
-            .andExpect(jsonPath("$.deviceId").exists());
+                        .header("X-Device-Id", deviceId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.displayName").value("Guest abc1"))
+                .andExpect(jsonPath("$.deviceId").exists());
     }
 
     @Test
     void putMyProfile_validBody_returns200() throws Exception {
         UUID deviceId = UUID.randomUUID();
         UserProfile profile = UserProfile.builder()
-            .deviceId(deviceId)
-            .displayName("Alice Updated")
-            .updatedAt(Instant.now())
-            .build();
+                .deviceId(deviceId)
+                .displayName("Alice Updated")
+                .updatedAt(Instant.now())
+                .build();
 
         when(userProfileService.updateDisplayName(any(), any())).thenReturn(profile);
 
         mockMvc.perform(put("/api/v1/users/me")
-                .header("X-Device-Id", deviceId.toString())
-                .contentType("application/json")
-                .content("{\"displayName\": \"Alice Updated\"}"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.displayName").value("Alice Updated"));
+                        .header("X-Device-Id", deviceId.toString())
+                        .contentType("application/json")
+                        .content("{\"displayName\": \"Alice Updated\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.displayName").value("Alice Updated"));
     }
 
     @Test
@@ -73,15 +73,15 @@ class UserProfileControllerTest {
         UUID deviceId = UUID.randomUUID();
 
         mockMvc.perform(put("/api/v1/users/me")
-                .header("X-Device-Id", deviceId.toString())
-                .contentType("application/json")
-                .content("{\"displayName\": \"\"}"))
-            .andExpect(status().isBadRequest());
+                        .header("X-Device-Id", deviceId.toString())
+                        .contentType("application/json")
+                        .content("{\"displayName\": \"\"}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
     void getMyProfile_noDeviceId_returns401() throws Exception {
         mockMvc.perform(get("/api/v1/users/me"))
-            .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized());
     }
 }

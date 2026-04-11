@@ -8,7 +8,6 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>3.3.6</version>
-        <relativePath/>
     </parent>
 
     <groupId>com.plantogether</groupId>
@@ -62,13 +61,13 @@
         <dependency>
             <groupId>com.plantogether</groupId>
             <artifactId>plantogether-common</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <version>1.0.0</version>
         </dependency>
         <!-- Proto stubs (gRPC generated) -->
         <dependency>
             <groupId>com.plantogether</groupId>
             <artifactId>plantogether-proto</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <version>1.0.0</version>
         </dependency>
         <!-- gRPC Netty transport (server) -->
         <dependency>
