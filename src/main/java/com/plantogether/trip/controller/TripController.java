@@ -1,29 +1,14 @@
 package com.plantogether.trip.controller;
 
 import com.plantogether.trip.domain.Trip;
-import com.plantogether.trip.dto.CreateTripRequest;
-import com.plantogether.trip.dto.JoinTripRequest;
-import com.plantogether.trip.dto.TripInvitationResponse;
-import com.plantogether.trip.dto.TripMemberResponse;
-import com.plantogether.trip.dto.TripPreviewResponse;
-import com.plantogether.trip.dto.TripResponse;
-import com.plantogether.trip.dto.UpdateTripRequest;
+import com.plantogether.trip.dto.*;
 import com.plantogether.trip.service.InvitationService;
 import com.plantogether.trip.service.TripService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
@@ -46,10 +31,10 @@ public class TripController {
             @Valid @RequestBody CreateTripRequest request) {
         UUID deviceId = UUID.fromString(authentication.getName());
         TripResponse response = tripService.createTripWithResponse(
-            deviceId,
-            request.getTitle(),
-            request.getDescription(),
-            request.getCurrency()
+                deviceId,
+                request.getTitle(),
+                request.getDescription(),
+                request.getCurrency()
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

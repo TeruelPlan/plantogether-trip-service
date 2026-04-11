@@ -34,38 +34,38 @@ public class TripResponse {
     @Deprecated
     public static TripResponse from(Trip trip) {
         return TripResponse.builder()
-            .id(trip.getId())
-            .title(trip.getTitle())
-            .description(trip.getDescription())
-            .status(trip.getStatus().name())
-            .referenceCurrency(trip.getReferenceCurrency())
-            .startDate(trip.getStartDate())
-            .endDate(trip.getEndDate())
-            .createdBy(trip.getCreatedBy())
-            .createdAt(trip.getCreatedAt())
-            .updatedAt(trip.getUpdatedAt())
-            .memberCount(0)
-            .members(List.of())
-            .build();
+                .id(trip.getId())
+                .title(trip.getTitle())
+                .description(trip.getDescription())
+                .status(trip.getStatus().name())
+                .referenceCurrency(trip.getReferenceCurrency())
+                .startDate(trip.getStartDate())
+                .endDate(trip.getEndDate())
+                .createdBy(trip.getCreatedBy())
+                .createdAt(trip.getCreatedAt())
+                .updatedAt(trip.getUpdatedAt())
+                .memberCount(0)
+                .members(List.of())
+                .build();
     }
 
     public static TripResponse from(Trip trip, List<TripMember> members) {
         List<TripMemberResponse> memberResponses = members.stream()
-            .map(TripMemberResponse::from)
-            .toList();
+                .map(TripMemberResponse::from)
+                .toList();
         return TripResponse.builder()
-            .id(trip.getId())
-            .title(trip.getTitle())
-            .description(trip.getDescription())
-            .status(trip.getStatus().name())
-            .referenceCurrency(trip.getReferenceCurrency())
-            .startDate(trip.getStartDate())
-            .endDate(trip.getEndDate())
-            .createdBy(trip.getCreatedBy())
-            .createdAt(trip.getCreatedAt())
-            .updatedAt(trip.getUpdatedAt())
-            .memberCount(memberResponses.size())
-            .members(memberResponses)
-            .build();
+                .id(trip.getId())
+                .title(trip.getTitle())
+                .description(trip.getDescription())
+                .status(trip.getStatus().name())
+                .referenceCurrency(trip.getReferenceCurrency())
+                .startDate(trip.getStartDate())
+                .endDate(trip.getEndDate())
+                .createdBy(trip.getCreatedBy())
+                .createdAt(trip.getCreatedAt())
+                .updatedAt(trip.getUpdatedAt())
+                .memberCount(memberResponses.size())
+                .members(memberResponses)
+                .build();
     }
 }

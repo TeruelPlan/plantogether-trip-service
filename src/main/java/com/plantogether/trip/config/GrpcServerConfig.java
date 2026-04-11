@@ -15,10 +15,9 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class GrpcServerConfig implements SmartLifecycle {
 
+    private final TripGrpcServiceImpl tripGrpcService;
     @Value("${grpc.server.port:9081}")
     private int grpcPort;
-
-    private final TripGrpcServiceImpl tripGrpcService;
     private Server server;
     private volatile boolean running = false;
 
@@ -30,9 +29,9 @@ public class GrpcServerConfig implements SmartLifecycle {
     public void start() {
         try {
             server = ServerBuilder.forPort(grpcPort)
-                .addService(tripGrpcService)
-                .build()
-                .start();
+                    .addService(tripGrpcService)
+                    .build()
+                    .start();
             running = true;
             log.info("gRPC server started on port {}", grpcPort);
         } catch (IOException e) {

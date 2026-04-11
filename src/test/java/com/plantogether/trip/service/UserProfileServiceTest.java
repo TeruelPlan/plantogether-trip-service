@@ -14,13 +14,9 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserProfileServiceTest {
@@ -38,11 +34,11 @@ class UserProfileServiceTest {
     void setUp() {
         testDeviceId = UUID.randomUUID();
         testProfile = UserProfile.builder()
-            .deviceId(testDeviceId)
-            .displayName("Alice")
-            .avatarUrl("https://example.com/alice.jpg")
-            .updatedAt(Instant.now())
-            .build();
+                .deviceId(testDeviceId)
+                .displayName("Alice")
+                .avatarUrl("https://example.com/alice.jpg")
+                .updatedAt(Instant.now())
+                .build();
     }
 
     @Test
@@ -51,7 +47,7 @@ class UserProfileServiceTest {
         when(userProfileRepository.save(any(UserProfile.class))).thenReturn(testProfile);
 
         UserProfile result = userProfileService.getOrCreateProfile(
-            testDeviceId, "Alice", "https://example.com/alice.jpg"
+                testDeviceId, "Alice", "https://example.com/alice.jpg"
         );
 
         assertNotNull(result);
@@ -66,7 +62,7 @@ class UserProfileServiceTest {
         when(userProfileRepository.findById(testDeviceId)).thenReturn(Optional.of(testProfile));
 
         UserProfile result = userProfileService.getOrCreateProfile(
-            testDeviceId, "Bob", "https://example.com/bob.jpg"
+                testDeviceId, "Bob", "https://example.com/bob.jpg"
         );
 
         assertNotNull(result);
@@ -92,7 +88,7 @@ class UserProfileServiceTest {
         when(userProfileRepository.findById(testDeviceId)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class,
-            () -> userProfileService.updateDisplayName(testDeviceId, "New Name")
+                () -> userProfileService.updateDisplayName(testDeviceId, "New Name")
         );
 
         verify(userProfileRepository).findById(testDeviceId);

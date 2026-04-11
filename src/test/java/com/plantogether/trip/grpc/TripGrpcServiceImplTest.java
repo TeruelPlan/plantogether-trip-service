@@ -21,9 +21,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -60,16 +58,16 @@ class TripGrpcServiceImplTest {
     @Test
     void isMember_memberExists_returnsTrue() {
         TripMember member = TripMember.builder()
-            .deviceId(deviceId).role(MemberRole.ORGANIZER).build();
+                .deviceId(deviceId).role(MemberRole.ORGANIZER).build();
         when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-            .thenReturn(Optional.of(member));
+                .thenReturn(Optional.of(member));
 
         grpcService.isMember(
-            IsMemberRequest.newBuilder()
-                .setTripId(tripId.toString())
-                .setDeviceId(deviceId.toString())
-                .build(),
-            isMemberObserver
+                IsMemberRequest.newBuilder()
+                        .setTripId(tripId.toString())
+                        .setDeviceId(deviceId.toString())
+                        .build(),
+                isMemberObserver
         );
 
         ArgumentCaptor<IsMemberResponse> captor = ArgumentCaptor.forClass(IsMemberResponse.class);
@@ -83,14 +81,14 @@ class TripGrpcServiceImplTest {
     @Test
     void isMember_notMember_returnsFalse() {
         when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-            .thenReturn(Optional.empty());
+                .thenReturn(Optional.empty());
 
         grpcService.isMember(
-            IsMemberRequest.newBuilder()
-                .setTripId(tripId.toString())
-                .setDeviceId(deviceId.toString())
-                .build(),
-            isMemberObserver
+                IsMemberRequest.newBuilder()
+                        .setTripId(tripId.toString())
+                        .setDeviceId(deviceId.toString())
+                        .build(),
+                isMemberObserver
         );
 
         ArgumentCaptor<IsMemberResponse> captor = ArgumentCaptor.forClass(IsMemberResponse.class);
@@ -104,21 +102,21 @@ class TripGrpcServiceImplTest {
     @Test
     void getTripMembers_returnsMemberList() {
         Trip trip = Trip.builder()
-            .id(tripId).title("Test").referenceCurrency("EUR")
-            .status(TripStatus.PLANNING).createdBy(deviceId)
-            .createdAt(Instant.now()).updatedAt(Instant.now()).build();
+                .id(tripId).title("Test").referenceCurrency("EUR")
+                .status(TripStatus.PLANNING).createdBy(deviceId)
+                .createdAt(Instant.now()).updatedAt(Instant.now()).build();
         when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
         TripMember m1 = TripMember.builder()
-            .deviceId(deviceId).role(MemberRole.ORGANIZER).displayName("Alice").build();
+                .deviceId(deviceId).role(MemberRole.ORGANIZER).displayName("Alice").build();
         UUID device2 = UUID.randomUUID();
         TripMember m2 = TripMember.builder()
-            .deviceId(device2).role(MemberRole.PARTICIPANT).displayName("Bob").build();
+                .deviceId(device2).role(MemberRole.PARTICIPANT).displayName("Bob").build();
         when(tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId))
-            .thenReturn(List.of(m1, m2));
+                .thenReturn(List.of(m1, m2));
 
         grpcService.getTripMembers(
-            GetTripMembersRequest.newBuilder().setTripId(tripId.toString()).build(),
-            getMembersObserver
+                GetTripMembersRequest.newBuilder().setTripId(tripId.toString()).build(),
+                getMembersObserver
         );
 
         ArgumentCaptor<GetTripMembersResponse> captor = ArgumentCaptor.forClass(GetTripMembersResponse.class);
@@ -133,14 +131,14 @@ class TripGrpcServiceImplTest {
     @Test
     void getTripCurrency_returnsCurrencyCode() {
         Trip trip = Trip.builder()
-            .id(tripId).title("Test").referenceCurrency("USD")
-            .status(TripStatus.PLANNING).createdBy(deviceId)
-            .createdAt(Instant.now()).updatedAt(Instant.now()).build();
+                .id(tripId).title("Test").referenceCurrency("USD")
+                .status(TripStatus.PLANNING).createdBy(deviceId)
+                .createdAt(Instant.now()).updatedAt(Instant.now()).build();
         when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
 
         grpcService.getTripCurrency(
-            GetTripCurrencyRequest.newBuilder().setTripId(tripId.toString()).build(),
-            getCurrencyObserver
+                GetTripCurrencyRequest.newBuilder().setTripId(tripId.toString()).build(),
+                getCurrencyObserver
         );
 
         ArgumentCaptor<GetTripCurrencyResponse> captor = ArgumentCaptor.forClass(GetTripCurrencyResponse.class);

@@ -22,28 +22,28 @@ public class UserProfileService {
     @Transactional
     public UserProfile getOrCreateProfile(UUID deviceId, String displayName, String avatarUrl) {
         return userProfileRepository.findById(deviceId)
-            .orElseGet(() -> {
-                try {
-                    return userProfileRepository.save(
-                        UserProfile.builder()
-                            .deviceId(deviceId)
-                            .displayName(displayName != null ? displayName : "Guest " + deviceId.toString().substring(0, 4))
-                            .avatarUrl(avatarUrl)
-                            .updatedAt(Instant.now())
-                            .build()
-                    );
-                } catch (DataIntegrityViolationException e) {
-                    // Concurrent insert — row was just created by another request; return it
-                    return userProfileRepository.findById(deviceId)
-                        .orElseThrow(() -> e);
-                }
-            });
+                .orElseGet(() -> {
+                    try {
+                        return userProfileRepository.save(
+                                UserProfile.builder()
+                                        .deviceId(deviceId)
+                                        .displayName(displayName != null ? displayName : "Guest " + deviceId.toString().substring(0, 4))
+                                        .avatarUrl(avatarUrl)
+                                        .updatedAt(Instant.now())
+                                        .build()
+                        );
+                    } catch (DataIntegrityViolationException e) {
+                        // Concurrent insert — row was just created by another request; return it
+                        return userProfileRepository.findById(deviceId)
+                                .orElseThrow(() -> e);
+                    }
+                });
     }
 
     @Transactional
     public UserProfile updateDisplayName(UUID deviceId, String newDisplayName) {
         UserProfile profile = userProfileRepository.findById(deviceId)
-            .orElseThrow(() -> new ResourceNotFoundException("Profile not found: " + deviceId));
+                .orElseThrow(() -> new ResourceNotFoundException("Profile not found: " + deviceId));
         profile.setDisplayName(newDisplayName);
         profile.setUpdatedAt(Instant.now());
         return userProfileRepository.save(profile);

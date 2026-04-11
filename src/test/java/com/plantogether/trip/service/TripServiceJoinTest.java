@@ -2,12 +2,7 @@ package com.plantogether.trip.service;
 
 import com.plantogether.common.exception.BadRequestException;
 import com.plantogether.common.exception.ResourceNotFoundException;
-import com.plantogether.trip.domain.MemberRole;
-import com.plantogether.trip.domain.Trip;
-import com.plantogether.trip.domain.TripInvitation;
-import com.plantogether.trip.domain.TripMember;
-import com.plantogether.trip.domain.TripStatus;
-import com.plantogether.trip.domain.UserProfile;
+import com.plantogether.trip.domain.*;
 import com.plantogether.trip.dto.TripPreviewResponse;
 import com.plantogether.trip.repository.TripInvitationRepository;
 import com.plantogether.trip.repository.TripMemberRepository;
@@ -22,18 +17,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class TripServiceJoinTest {
@@ -71,23 +60,23 @@ class TripServiceJoinTest {
         deviceId = UUID.randomUUID();
         token = UUID.randomUUID();
         trip = Trip.builder()
-            .id(tripId).title("Test Trip").status(TripStatus.PLANNING)
-            .createdBy(UUID.randomUUID()).referenceCurrency("EUR")
-            .createdAt(Instant.now()).updatedAt(Instant.now())
-            .build();
+                .id(tripId).title("Test Trip").status(TripStatus.PLANNING)
+                .createdBy(UUID.randomUUID()).referenceCurrency("EUR")
+                .createdAt(Instant.now()).updatedAt(Instant.now())
+                .build();
         invitation = TripInvitation.builder()
-            .trip(trip).token(token).createdBy(trip.getCreatedBy()).createdAt(Instant.now())
-            .build();
+                .trip(trip).token(token).createdBy(trip.getCreatedBy()).createdAt(Instant.now())
+                .build();
     }
 
     @Test
     void joinTrip_validToken_createsParticipant() {
         UserProfile profile = UserProfile.builder()
-            .deviceId(deviceId).displayName("Bob").updatedAt(Instant.now()).build();
+                .deviceId(deviceId).displayName("Bob").updatedAt(Instant.now()).build();
 
         when(tripInvitationRepository.findByToken(token)).thenReturn(Optional.of(invitation));
         when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-            .thenReturn(Optional.empty());
+                .thenReturn(Optional.empty());
         when(userProfileRepository.findById(deviceId)).thenReturn(Optional.of(profile));
         when(tripMemberRepository.save(any(TripMember.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -101,11 +90,11 @@ class TripServiceJoinTest {
     @Test
     void joinTrip_alreadyMember_idempotent() {
         TripMember existing = TripMember.builder()
-            .deviceId(deviceId).role(MemberRole.PARTICIPANT).build();
+                .deviceId(deviceId).role(MemberRole.PARTICIPANT).build();
 
         when(tripInvitationRepository.findByToken(token)).thenReturn(Optional.of(invitation));
         when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-            .thenReturn(Optional.of(existing));
+                .thenReturn(Optional.of(existing));
 
         Trip result = tripService.joinTrip(tripId, token, deviceId);
 
@@ -119,7 +108,7 @@ class TripServiceJoinTest {
         when(tripInvitationRepository.findByToken(token)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class,
-            () -> tripService.joinTrip(tripId, token, deviceId));
+                () -> tripService.joinTrip(tripId, token, deviceId));
     }
 
     @Test
@@ -128,32 +117,32 @@ class TripServiceJoinTest {
         when(tripInvitationRepository.findByToken(token)).thenReturn(Optional.of(invitation));
 
         assertThrows(BadRequestException.class,
-            () -> tripService.joinTrip(wrongTripId, token, deviceId));
+                () -> tripService.joinTrip(wrongTripId, token, deviceId));
     }
 
     @Test
     void joinTrip_noProfile_throws400() {
         when(tripInvitationRepository.findByToken(token)).thenReturn(Optional.of(invitation));
         when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-            .thenReturn(Optional.empty());
+                .thenReturn(Optional.empty());
         when(userProfileRepository.findById(deviceId)).thenReturn(Optional.empty());
 
         assertThrows(BadRequestException.class,
-            () -> tripService.joinTrip(tripId, token, deviceId));
+                () -> tripService.joinTrip(tripId, token, deviceId));
     }
 
     @Test
     void joinTrip_nullDisplayName_throws400() {
         UserProfile profileNoName = UserProfile.builder()
-            .deviceId(deviceId).displayName(null).updatedAt(Instant.now()).build();
+                .deviceId(deviceId).displayName(null).updatedAt(Instant.now()).build();
 
         when(tripInvitationRepository.findByToken(token)).thenReturn(Optional.of(invitation));
         when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-            .thenReturn(Optional.empty());
+                .thenReturn(Optional.empty());
         when(userProfileRepository.findById(deviceId)).thenReturn(Optional.of(profileNoName));
 
         assertThrows(BadRequestException.class,
-            () -> tripService.joinTrip(tripId, token, deviceId));
+                () -> tripService.joinTrip(tripId, token, deviceId));
     }
 
     @Test
@@ -161,7 +150,7 @@ class TripServiceJoinTest {
         when(tripInvitationRepository.findByToken(token)).thenReturn(Optional.of(invitation));
         when(tripMemberRepository.countByTripIdAndDeletedAtIsNull(tripId)).thenReturn(1L);
         when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-            .thenReturn(Optional.empty());
+                .thenReturn(Optional.empty());
 
         TripPreviewResponse result = tripService.getTripPreview(tripId, token, deviceId);
 
@@ -177,7 +166,7 @@ class TripServiceJoinTest {
         when(tripInvitationRepository.findByToken(token)).thenReturn(Optional.of(invitation));
         when(tripMemberRepository.countByTripIdAndDeletedAtIsNull(tripId)).thenReturn(1L);
         when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-            .thenReturn(Optional.of(existing));
+                .thenReturn(Optional.of(existing));
 
         TripPreviewResponse result = tripService.getTripPreview(tripId, token, deviceId);
 
@@ -189,6 +178,6 @@ class TripServiceJoinTest {
         when(tripInvitationRepository.findByToken(token)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class,
-            () -> tripService.getTripPreview(tripId, token, deviceId));
+                () -> tripService.getTripPreview(tripId, token, deviceId));
     }
 }
