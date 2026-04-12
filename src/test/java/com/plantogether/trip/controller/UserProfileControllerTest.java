@@ -3,6 +3,7 @@ package com.plantogether.trip.controller;
 import com.plantogether.common.security.SecurityAutoConfiguration;
 import com.plantogether.trip.domain.UserProfile;
 import com.plantogether.trip.service.UserProfileService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -13,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.Instant;
 import java.util.UUID;
 
+import org.mockito.Mockito;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -29,6 +31,11 @@ class UserProfileControllerTest {
 
     @MockBean
     private UserProfileService userProfileService;
+
+    @AfterEach
+    void tearDown() {
+        Mockito.reset(userProfileService);
+    }
 
     @Test
     void getMyProfile_withDeviceId_returns200() throws Exception {

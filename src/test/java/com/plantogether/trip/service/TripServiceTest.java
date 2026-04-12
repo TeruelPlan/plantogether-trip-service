@@ -11,12 +11,15 @@ import com.plantogether.trip.exception.TripStateException;
 import com.plantogether.trip.repository.TripMemberRepository;
 import com.plantogether.trip.repository.TripRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
@@ -32,23 +35,16 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class TripServiceTest {
 
-    @Mock
-    private TripRepository tripRepository;
-
-    @Mock
-    private TripMemberRepository tripMemberRepository;
-
-    @Mock
-    private UserProfileService userProfileService;
-
-    @Mock
-    private ApplicationEventPublisher applicationEventPublisher;
+    @Mock TripRepository tripRepository;
+    @Mock TripMemberRepository tripMemberRepository;
+    @Mock UserProfileService userProfileService;
+    @Mock ApplicationEventPublisher applicationEventPublisher;
 
     @InjectMocks
-    private TripService tripService;
+    TripService tripService;
 
-    private UUID deviceId;
-    private UserProfile profile;
+    UUID deviceId;
+    UserProfile profile;
 
     @BeforeEach
     void setUp() {
@@ -60,382 +56,391 @@ class TripServiceTest {
                 .build();
     }
 
-    @Test
-    void createTrip_savesTrip_savesMember_publishesEvent() {
-        when(userProfileService.getOrCreateProfile(deviceId, null, null)).thenReturn(profile);
-        when(tripRepository.save(any(Trip.class))).thenAnswer(inv -> {
-            Trip t = inv.getArgument(0);
-            t.setId(UUID.randomUUID());
-            return t;
-        });
-        when(tripMemberRepository.save(any(TripMember.class))).thenAnswer(inv -> inv.getArgument(0));
+    // -------------------------------------------------------------------------
 
-        Trip result = tripService.createTrip(deviceId, "Beach Trip", "Fun", "USD");
+    @Nested
+    class CreateTrip {
 
-        assertNotNull(result.getId());
-        assertEquals("Beach Trip", result.getTitle());
-        assertEquals(TripStatus.PLANNING, result.getStatus());
-        assertEquals("USD", result.getReferenceCurrency());
-        assertEquals(deviceId, result.getCreatedBy());
+        @BeforeEach
+        void stubDefaults() {
+            when(userProfileService.getOrCreateProfile(deviceId, null, null)).thenReturn(profile);
+            when(tripRepository.save(any(Trip.class))).thenAnswer(inv -> {
+                Trip t = inv.getArgument(0);
+                t.setId(UUID.randomUUID());
+                return t;
+            });
+            when(tripMemberRepository.save(any(TripMember.class))).thenAnswer(inv -> inv.getArgument(0));
+        }
 
-        ArgumentCaptor<TripMember> memberCaptor = ArgumentCaptor.forClass(TripMember.class);
-        verify(tripMemberRepository).save(memberCaptor.capture());
-        TripMember savedMember = memberCaptor.getValue();
-        assertEquals(deviceId, savedMember.getDeviceId());
-        assertEquals(MemberRole.ORGANIZER, savedMember.getRole());
-        assertEquals("Alice", savedMember.getDisplayName());
+        @Test
+        void createTrip_savesTrip_savesMember_publishesEvent() {
+            Trip result = tripService.createTrip(deviceId, "Beach Trip", "Fun", "USD");
 
-        verify(applicationEventPublisher).publishEvent(result);
+            assertNotNull(result.getId());
+            assertEquals("Beach Trip", result.getTitle());
+            assertEquals(TripStatus.PLANNING, result.getStatus());
+            assertEquals("USD", result.getReferenceCurrency());
+            assertEquals(deviceId, result.getCreatedBy());
+
+            ArgumentCaptor<TripMember> memberCaptor = ArgumentCaptor.forClass(TripMember.class);
+            verify(tripMemberRepository).save(memberCaptor.capture());
+            TripMember savedMember = memberCaptor.getValue();
+            assertEquals(deviceId, savedMember.getDeviceId());
+            assertEquals(MemberRole.ORGANIZER, savedMember.getRole());
+            assertEquals("Alice", savedMember.getDisplayName());
+
+            verify(applicationEventPublisher).publishEvent(result);
+        }
+
+        @Test
+        void createTrip_nullCurrency_defaultsToEUR() {
+            Trip result = tripService.createTrip(deviceId, "Trip", null, null);
+            assertEquals("EUR", result.getReferenceCurrency());
+        }
     }
 
-    @Test
-    void createTrip_nullCurrency_defaultsToEUR() {
-        when(userProfileService.getOrCreateProfile(deviceId, null, null)).thenReturn(profile);
-        when(tripRepository.save(any(Trip.class))).thenAnswer(inv -> {
-            Trip t = inv.getArgument(0);
-            t.setId(UUID.randomUUID());
-            return t;
-        });
-        when(tripMemberRepository.save(any(TripMember.class))).thenAnswer(inv -> inv.getArgument(0));
+    // -------------------------------------------------------------------------
 
-        Trip result = tripService.createTrip(deviceId, "Trip", null, null);
+    @Nested
+    @MockitoSettings(strictness = Strictness.LENIENT)
+    class GetTrip {
 
-        assertEquals("EUR", result.getReferenceCurrency());
+        UUID tripId;
+        Trip trip;
+        TripMember member;
+
+        @BeforeEach
+        void stubDefaults() {
+            tripId = UUID.randomUUID();
+            trip = Trip.builder().id(tripId).title("Test").status(TripStatus.PLANNING)
+                    .createdBy(deviceId).referenceCurrency("EUR")
+                    .createdAt(Instant.now()).updatedAt(Instant.now()).build();
+            member = TripMember.builder()
+                    .deviceId(deviceId).displayName("Alice").role(MemberRole.ORGANIZER)
+                    .joinedAt(Instant.now()).build();
+
+            when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
+            when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+                    .thenReturn(Optional.of(member));
+        }
+
+        @Test
+        void getTrip_memberExists_returnsTrip() {
+            Trip result = tripService.getTrip(tripId, deviceId);
+            assertEquals(tripId, result.getId());
+        }
+
+        @Test
+        void getTrip_notMember_throwsAccessDenied() {
+            when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+                    .thenReturn(Optional.empty());
+            assertThrows(AccessDeniedException.class, () -> tripService.getTrip(tripId, deviceId));
+        }
+
+        @Test
+        void getTrip_notFound_throwsResourceNotFound() {
+            when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.empty());
+            assertThrows(ResourceNotFoundException.class, () -> tripService.getTrip(tripId, deviceId));
+        }
+
+        @Test
+        void getTripResponse_memberExists_returnsTripResponseWithMembers() {
+            when(tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId))
+                    .thenReturn(List.of(member));
+
+            TripResponse response = tripService.getTripResponse(tripId, deviceId);
+
+            assertEquals(tripId, response.getId());
+            assertEquals(1, response.getMemberCount());
+            assertNotNull(response.getMembers());
+            assertEquals(1, response.getMembers().size());
+            assertEquals("Alice", response.getMembers().get(0).getDisplayName());
+            assertEquals("ORGANIZER", response.getMembers().get(0).getRole());
+        }
     }
 
-    @Test
-    void getTrip_memberExists_returnsTrip() {
-        UUID tripId = UUID.randomUUID();
-        Trip trip = Trip.builder().id(tripId).title("Test").status(TripStatus.PLANNING)
-                .createdBy(deviceId).referenceCurrency("EUR")
-                .createdAt(Instant.now()).updatedAt(Instant.now()).build();
-        TripMember member = TripMember.builder().deviceId(deviceId).role(MemberRole.ORGANIZER).build();
+    // -------------------------------------------------------------------------
 
-        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
-        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-                .thenReturn(Optional.of(member));
+    @Nested
+    class ListTrips {
 
-        Trip result = tripService.getTrip(tripId, deviceId);
-        assertEquals(tripId, result.getId());
+        @Test
+        void listTripsForDevice_delegatesToRepository() {
+            Trip trip = Trip.builder().id(UUID.randomUUID()).title("Test").build();
+            when(tripRepository.findAllByMemberDeviceId(deviceId)).thenReturn(List.of(trip));
+
+            List<Trip> result = tripService.listTripsForDevice(deviceId);
+
+            assertEquals(1, result.size());
+            verify(tripRepository).findAllByMemberDeviceId(deviceId);
+        }
+
+        @Test
+        void listTripResponsesForDevice_returnsMemberCount() {
+            UUID tripId = UUID.randomUUID();
+            Trip trip = Trip.builder().id(tripId).title("Test").status(TripStatus.PLANNING)
+                    .createdBy(deviceId).referenceCurrency("EUR")
+                    .createdAt(Instant.now()).updatedAt(Instant.now()).build();
+
+            when(tripRepository.findAllByMemberDeviceId(deviceId)).thenReturn(List.of(trip));
+            when(tripMemberRepository.countByTripIdAndDeletedAtIsNull(tripId)).thenReturn(1L);
+
+            List<TripResponse> responses = tripService.listTripResponsesForDevice(deviceId);
+
+            assertEquals(1, responses.size());
+            assertEquals(1, responses.get(0).getMemberCount());
+            assertNotNull(responses.get(0).getMembers());
+            assertEquals(0, responses.get(0).getMembers().size());
+            assertEquals("Test", responses.get(0).getTitle());
+        }
     }
 
-    @Test
-    void getTrip_notMember_throwsAccessDenied() {
-        UUID tripId = UUID.randomUUID();
-        Trip trip = Trip.builder().id(tripId).title("Test").status(TripStatus.PLANNING)
-                .createdBy(UUID.randomUUID()).referenceCurrency("EUR")
-                .createdAt(Instant.now()).updatedAt(Instant.now()).build();
+    // -------------------------------------------------------------------------
 
-        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
-        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-                .thenReturn(Optional.empty());
+    @Nested
+    @MockitoSettings(strictness = Strictness.LENIENT)
+    class UpdateTrip {
 
-        assertThrows(AccessDeniedException.class, () -> tripService.getTrip(tripId, deviceId));
+        UUID tripId;
+        TripMember organizer;
+
+        @BeforeEach
+        void stubOrganizerAndSave() {
+            tripId = UUID.randomUUID();
+            organizer = TripMember.builder().deviceId(deviceId).role(MemberRole.ORGANIZER)
+                    .displayName("Alice").joinedAt(Instant.now()).build();
+            when(tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId))
+                    .thenReturn(List.of(organizer));
+            when(tripRepository.save(any(Trip.class))).thenAnswer(inv -> inv.getArgument(0));
+        }
+
+        private void stubPlanningTrip() {
+            Trip trip = Trip.builder().id(tripId).title("Old Title").description("Old Desc")
+                    .status(TripStatus.PLANNING).createdBy(deviceId).referenceCurrency("EUR")
+                    .createdAt(Instant.now()).updatedAt(Instant.now()).build();
+            when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
+            when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+                    .thenReturn(Optional.of(organizer));
+        }
+
+        @Test
+        void updateTrip_organizerCanUpdateTitle() {
+            stubPlanningTrip();
+            UpdateTripRequest request = UpdateTripRequest.builder().title("New Title").build();
+            TripResponse response = tripService.updateTrip(tripId, deviceId, request);
+            assertEquals("New Title", response.getTitle());
+            assertEquals("Old Desc", response.getDescription());
+        }
+
+        @Test
+        void updateTrip_organizerCanUpdateDescriptionAndCurrency() {
+            Trip trip = Trip.builder().id(tripId).title("Trip").description("Old")
+                    .status(TripStatus.PLANNING).createdBy(deviceId).referenceCurrency("EUR")
+                    .createdAt(Instant.now()).updatedAt(Instant.now()).build();
+            when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
+            when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+                    .thenReturn(Optional.of(organizer));
+
+            UpdateTripRequest request = UpdateTripRequest.builder()
+                    .title("Trip").description("New Desc").referenceCurrency("USD").build();
+            TripResponse response = tripService.updateTrip(tripId, deviceId, request);
+
+            assertEquals("New Desc", response.getDescription());
+            assertEquals("USD", response.getReferenceCurrency());
+        }
+
+        @Test
+        void updateTrip_participantGetsAccessDenied() {
+            TripMember participant = TripMember.builder().deviceId(deviceId).role(MemberRole.PARTICIPANT)
+                    .displayName("Bob").joinedAt(Instant.now()).build();
+            Trip trip = Trip.builder().id(tripId).title("Trip").status(TripStatus.PLANNING)
+                    .createdBy(UUID.randomUUID()).referenceCurrency("EUR")
+                    .createdAt(Instant.now()).updatedAt(Instant.now()).build();
+            when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
+            when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+                    .thenReturn(Optional.of(participant));
+
+            assertThrows(AccessDeniedException.class,
+                    () -> tripService.updateTrip(tripId, deviceId, UpdateTripRequest.builder().title("Hacked").build()));
+        }
+
+        @Test
+        void updateTrip_nonMemberGetsAccessDenied() {
+            Trip trip = Trip.builder().id(tripId).title("Trip").status(TripStatus.PLANNING)
+                    .createdBy(UUID.randomUUID()).referenceCurrency("EUR")
+                    .createdAt(Instant.now()).updatedAt(Instant.now()).build();
+            when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
+            when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+                    .thenReturn(Optional.empty());
+
+            assertThrows(AccessDeniedException.class,
+                    () -> tripService.updateTrip(tripId, deviceId, UpdateTripRequest.builder().title("Hacked").build()));
+        }
+
+        @Test
+        void updateTrip_archivedTripThrowsTripStateException() {
+            Trip trip = Trip.builder().id(tripId).title("Trip").status(TripStatus.ARCHIVED)
+                    .createdBy(deviceId).referenceCurrency("EUR")
+                    .createdAt(Instant.now()).updatedAt(Instant.now()).build();
+            when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
+            when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+                    .thenReturn(Optional.of(organizer));
+
+            assertThrows(TripStateException.class,
+                    () -> tripService.updateTrip(tripId, deviceId, UpdateTripRequest.builder().title("Nope").build()));
+        }
     }
 
-    @Test
-    void getTrip_notFound_throwsResourceNotFound() {
-        UUID tripId = UUID.randomUUID();
-        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.empty());
+    // -------------------------------------------------------------------------
 
-        assertThrows(ResourceNotFoundException.class, () -> tripService.getTrip(tripId, deviceId));
+    @Nested
+    @MockitoSettings(strictness = Strictness.LENIENT)
+    class ArchiveTrip {
+
+        UUID tripId;
+        TripMember organizer;
+
+        @BeforeEach
+        void stubOrganizerAndSave() {
+            tripId = UUID.randomUUID();
+            organizer = TripMember.builder().deviceId(deviceId).role(MemberRole.ORGANIZER)
+                    .displayName("Alice").joinedAt(Instant.now()).build();
+            when(tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId))
+                    .thenReturn(List.of(organizer));
+            when(tripRepository.save(any(Trip.class))).thenAnswer(inv -> inv.getArgument(0));
+        }
+
+        @Test
+        void archiveTrip_organizerCanArchivePlanningTrip() {
+            Trip trip = Trip.builder().id(tripId).title("Trip").status(TripStatus.PLANNING)
+                    .createdBy(deviceId).referenceCurrency("EUR")
+                    .createdAt(Instant.now()).updatedAt(Instant.now()).build();
+            when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
+            when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+                    .thenReturn(Optional.of(organizer));
+
+            TripResponse response = tripService.archiveTrip(tripId, deviceId);
+
+            assertEquals("ARCHIVED", response.getStatus());
+        }
+
+        @Test
+        void archiveTrip_alreadyArchivedThrowsIllegalState() {
+            Trip trip = Trip.builder().id(tripId).title("Trip").status(TripStatus.ARCHIVED)
+                    .createdBy(deviceId).referenceCurrency("EUR")
+                    .createdAt(Instant.now()).updatedAt(Instant.now()).build();
+            when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
+            when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+                    .thenReturn(Optional.of(organizer));
+
+            assertThrows(TripStateException.class, () -> tripService.archiveTrip(tripId, deviceId));
+        }
+
+        @Test
+        void archiveTrip_participantGetsAccessDenied() {
+            TripMember participant = TripMember.builder().deviceId(deviceId).role(MemberRole.PARTICIPANT)
+                    .displayName("Bob").joinedAt(Instant.now()).build();
+            Trip trip = Trip.builder().id(tripId).title("Trip").status(TripStatus.PLANNING)
+                    .createdBy(UUID.randomUUID()).referenceCurrency("EUR")
+                    .createdAt(Instant.now()).updatedAt(Instant.now()).build();
+            when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
+            when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+                    .thenReturn(Optional.of(participant));
+
+            assertThrows(AccessDeniedException.class, () -> tripService.archiveTrip(tripId, deviceId));
+        }
     }
 
-    @Test
-    void listTripsForDevice_delegatesToRepository() {
-        Trip trip = Trip.builder().id(UUID.randomUUID()).title("Test").build();
-        when(tripRepository.findAllByMemberDeviceId(deviceId)).thenReturn(List.of(trip));
+    // -------------------------------------------------------------------------
 
-        List<Trip> result = tripService.listTripsForDevice(deviceId);
-        assertEquals(1, result.size());
-        verify(tripRepository).findAllByMemberDeviceId(deviceId);
+    @Nested
+    class TripMembers {
+
+        UUID tripId;
+        TripMember organizer;
+
+        @BeforeEach
+        void stubOrganizer() {
+            tripId = UUID.randomUUID();
+            organizer = TripMember.builder()
+                    .deviceId(deviceId).displayName("Alice").role(MemberRole.ORGANIZER)
+                    .joinedAt(Instant.now()).build();
+            when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+                    .thenReturn(Optional.of(organizer));
+        }
+
+        @Test
+        void getTripMembers_memberExists_returnsMemberList() {
+            when(tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId))
+                    .thenReturn(List.of(organizer));
+
+            List<TripMemberResponse> result = tripService.getTripMembers(tripId, deviceId);
+
+            assertEquals(1, result.size());
+            assertEquals("Alice", result.get(0).getDisplayName());
+            assertEquals("ORGANIZER", result.get(0).getRole());
+        }
+
+        @Test
+        void getTripMembers_notMember_throwsAccessDenied() {
+            when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+                    .thenReturn(Optional.empty());
+            assertThrows(AccessDeniedException.class, () -> tripService.getTripMembers(tripId, deviceId));
+        }
     }
 
-    @Test
-    void getTripResponse_memberExists_returnsTripResponseWithMembers() {
-        UUID tripId = UUID.randomUUID();
-        Trip trip = Trip.builder().id(tripId).title("Test").status(TripStatus.PLANNING)
-                .createdBy(deviceId).referenceCurrency("EUR")
-                .createdAt(Instant.now()).updatedAt(Instant.now()).build();
-        TripMember member = TripMember.builder()
-                .deviceId(deviceId).displayName("Alice").role(MemberRole.ORGANIZER)
-                .joinedAt(Instant.now()).build();
+    // -------------------------------------------------------------------------
 
-        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
-        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-                .thenReturn(Optional.of(member));
-        when(tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId))
-                .thenReturn(List.of(member));
+    @Nested
+    class RemoveMember {
 
-        TripResponse response = tripService.getTripResponse(tripId, deviceId);
+        UUID tripId;
+        TripMember organizer;
 
-        assertEquals(tripId, response.getId());
-        assertEquals(1, response.getMemberCount());
-        assertNotNull(response.getMembers());
-        assertEquals(1, response.getMembers().size());
-        assertEquals("Alice", response.getMembers().get(0).getDisplayName());
-        assertEquals("ORGANIZER", response.getMembers().get(0).getRole());
-    }
+        @BeforeEach
+        void stubOrganizer() {
+            tripId = UUID.randomUUID();
+            organizer = TripMember.builder().deviceId(deviceId).role(MemberRole.ORGANIZER).build();
+            when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+                    .thenReturn(Optional.of(organizer));
+        }
 
-    // --- updateTrip tests ---
+        @Test
+        void removeMember_organizerRemovesParticipant_softDeletes() {
+            UUID targetId = UUID.randomUUID();
+            TripMember target = TripMember.builder().deviceId(targetId).role(MemberRole.PARTICIPANT).build();
+            when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, targetId))
+                    .thenReturn(Optional.of(target));
+            when(tripMemberRepository.save(any(TripMember.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    @Test
-    void updateTrip_organizerCanUpdateTitle() {
-        UUID tripId = UUID.randomUUID();
-        Trip trip = Trip.builder().id(tripId).title("Old Title").description("Old Desc")
-                .status(TripStatus.PLANNING).createdBy(deviceId).referenceCurrency("EUR")
-                .createdAt(Instant.now()).updatedAt(Instant.now()).build();
-        TripMember member = TripMember.builder().deviceId(deviceId).role(MemberRole.ORGANIZER)
-                .displayName("Alice").joinedAt(Instant.now()).build();
+            tripService.removeMember(tripId, deviceId, targetId);
 
-        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
-        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-                .thenReturn(Optional.of(member));
-        when(tripRepository.save(any(Trip.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId)).thenReturn(List.of(member));
+            assertNotNull(target.getDeletedAt());
+            verify(tripMemberRepository).save(target);
+        }
 
-        UpdateTripRequest request = UpdateTripRequest.builder().title("New Title").build();
-        TripResponse response = tripService.updateTrip(tripId, deviceId, request);
+        @Test
+        void removeMember_organizerRemovesSelf_throwsBadRequest() {
+            assertThrows(BadRequestException.class, () -> tripService.removeMember(tripId, deviceId, deviceId));
+        }
 
-        assertEquals("New Title", response.getTitle());
-        assertEquals("Old Desc", response.getDescription());
-    }
+        @Test
+        void removeMember_participantRemovesAnother_throwsAccessDenied() {
+            UUID targetId = UUID.randomUUID();
+            TripMember participant = TripMember.builder().deviceId(deviceId).role(MemberRole.PARTICIPANT).build();
+            when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+                    .thenReturn(Optional.of(participant));
 
-    @Test
-    void updateTrip_organizerCanUpdateDescriptionAndCurrency() {
-        UUID tripId = UUID.randomUUID();
-        Trip trip = Trip.builder().id(tripId).title("Trip").description("Old")
-                .status(TripStatus.PLANNING).createdBy(deviceId).referenceCurrency("EUR")
-                .createdAt(Instant.now()).updatedAt(Instant.now()).build();
-        TripMember member = TripMember.builder().deviceId(deviceId).role(MemberRole.ORGANIZER)
-                .displayName("Alice").joinedAt(Instant.now()).build();
+            assertThrows(AccessDeniedException.class, () -> tripService.removeMember(tripId, deviceId, targetId));
+        }
 
-        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
-        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-                .thenReturn(Optional.of(member));
-        when(tripRepository.save(any(Trip.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId)).thenReturn(List.of(member));
+        @Test
+        void removeMember_targetNotFound_throwsResourceNotFound() {
+            UUID targetId = UUID.randomUUID();
+            when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, targetId))
+                    .thenReturn(Optional.empty());
 
-        UpdateTripRequest request = UpdateTripRequest.builder()
-                .title("Trip").description("New Desc").referenceCurrency("USD").build();
-        TripResponse response = tripService.updateTrip(tripId, deviceId, request);
-
-        assertEquals("New Desc", response.getDescription());
-        assertEquals("USD", response.getReferenceCurrency());
-    }
-
-    @Test
-    void updateTrip_participantGetsAccessDenied() {
-        UUID tripId = UUID.randomUUID();
-        Trip trip = Trip.builder().id(tripId).title("Trip").status(TripStatus.PLANNING)
-                .createdBy(UUID.randomUUID()).referenceCurrency("EUR")
-                .createdAt(Instant.now()).updatedAt(Instant.now()).build();
-        TripMember member = TripMember.builder().deviceId(deviceId).role(MemberRole.PARTICIPANT)
-                .displayName("Bob").joinedAt(Instant.now()).build();
-
-        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
-        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-                .thenReturn(Optional.of(member));
-
-        UpdateTripRequest request = UpdateTripRequest.builder().title("Hacked").build();
-        assertThrows(AccessDeniedException.class, () -> tripService.updateTrip(tripId, deviceId, request));
-    }
-
-    @Test
-    void updateTrip_nonMemberGetsAccessDenied() {
-        UUID tripId = UUID.randomUUID();
-        Trip trip = Trip.builder().id(tripId).title("Trip").status(TripStatus.PLANNING)
-                .createdBy(UUID.randomUUID()).referenceCurrency("EUR")
-                .createdAt(Instant.now()).updatedAt(Instant.now()).build();
-
-        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
-        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-                .thenReturn(Optional.empty());
-
-        UpdateTripRequest request = UpdateTripRequest.builder().title("Hacked").build();
-        assertThrows(AccessDeniedException.class, () -> tripService.updateTrip(tripId, deviceId, request));
-    }
-
-    // --- archiveTrip tests ---
-
-    @Test
-    void archiveTrip_organizerCanArchivePlanningTrip() {
-        UUID tripId = UUID.randomUUID();
-        Trip trip = Trip.builder().id(tripId).title("Trip").status(TripStatus.PLANNING)
-                .createdBy(deviceId).referenceCurrency("EUR")
-                .createdAt(Instant.now()).updatedAt(Instant.now()).build();
-        TripMember member = TripMember.builder().deviceId(deviceId).role(MemberRole.ORGANIZER)
-                .displayName("Alice").joinedAt(Instant.now()).build();
-
-        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
-        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-                .thenReturn(Optional.of(member));
-        when(tripRepository.save(any(Trip.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId)).thenReturn(List.of(member));
-
-        TripResponse response = tripService.archiveTrip(tripId, deviceId);
-
-        assertEquals("ARCHIVED", response.getStatus());
-    }
-
-    @Test
-    void archiveTrip_alreadyArchivedThrowsIllegalState() {
-        UUID tripId = UUID.randomUUID();
-        Trip trip = Trip.builder().id(tripId).title("Trip").status(TripStatus.ARCHIVED)
-                .createdBy(deviceId).referenceCurrency("EUR")
-                .createdAt(Instant.now()).updatedAt(Instant.now()).build();
-        TripMember member = TripMember.builder().deviceId(deviceId).role(MemberRole.ORGANIZER)
-                .displayName("Alice").joinedAt(Instant.now()).build();
-
-        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
-        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-                .thenReturn(Optional.of(member));
-
-        assertThrows(TripStateException.class, () -> tripService.archiveTrip(tripId, deviceId));
-    }
-
-    @Test
-    void archiveTrip_participantGetsAccessDenied() {
-        UUID tripId = UUID.randomUUID();
-        Trip trip = Trip.builder().id(tripId).title("Trip").status(TripStatus.PLANNING)
-                .createdBy(UUID.randomUUID()).referenceCurrency("EUR")
-                .createdAt(Instant.now()).updatedAt(Instant.now()).build();
-        TripMember member = TripMember.builder().deviceId(deviceId).role(MemberRole.PARTICIPANT)
-                .displayName("Bob").joinedAt(Instant.now()).build();
-
-        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
-        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-                .thenReturn(Optional.of(member));
-
-        assertThrows(AccessDeniedException.class, () -> tripService.archiveTrip(tripId, deviceId));
-    }
-
-    @Test
-    void updateTrip_archivedTripThrowsTripStateException() {
-        UUID tripId = UUID.randomUUID();
-        Trip trip = Trip.builder().id(tripId).title("Trip").status(TripStatus.ARCHIVED)
-                .createdBy(deviceId).referenceCurrency("EUR")
-                .createdAt(Instant.now()).updatedAt(Instant.now()).build();
-        TripMember member = TripMember.builder().deviceId(deviceId).role(MemberRole.ORGANIZER)
-                .displayName("Alice").joinedAt(Instant.now()).build();
-
-        when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
-        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-                .thenReturn(Optional.of(member));
-
-        UpdateTripRequest request = UpdateTripRequest.builder().title("Nope").build();
-        assertThrows(TripStateException.class, () -> tripService.updateTrip(tripId, deviceId, request));
-    }
-
-    // --- getTripMembers tests ---
-
-    @Test
-    void getTripMembers_memberExists_returnsMemberList() {
-        UUID tripId = UUID.randomUUID();
-        TripMember member = TripMember.builder()
-                .deviceId(deviceId).displayName("Alice").role(MemberRole.ORGANIZER)
-                .joinedAt(Instant.now()).build();
-
-        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-                .thenReturn(Optional.of(member));
-        when(tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId))
-                .thenReturn(List.of(member));
-
-        List<TripMemberResponse> result = tripService.getTripMembers(tripId, deviceId);
-
-        assertEquals(1, result.size());
-        assertEquals("Alice", result.get(0).getDisplayName());
-        assertEquals("ORGANIZER", result.get(0).getRole());
-    }
-
-    @Test
-    void getTripMembers_notMember_throwsAccessDenied() {
-        UUID tripId = UUID.randomUUID();
-
-        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-                .thenReturn(Optional.empty());
-
-        assertThrows(AccessDeniedException.class, () -> tripService.getTripMembers(tripId, deviceId));
-    }
-
-    // --- removeMember tests ---
-
-    @Test
-    void removeMember_organizerRemovesParticipant_softDeletes() {
-        UUID tripId = UUID.randomUUID();
-        UUID targetId = UUID.randomUUID();
-        TripMember organizer = TripMember.builder().deviceId(deviceId).role(MemberRole.ORGANIZER).build();
-        TripMember target = TripMember.builder().deviceId(targetId).role(MemberRole.PARTICIPANT).build();
-
-        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-                .thenReturn(Optional.of(organizer));
-        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, targetId))
-                .thenReturn(Optional.of(target));
-        when(tripMemberRepository.save(any(TripMember.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        tripService.removeMember(tripId, deviceId, targetId);
-
-        assertNotNull(target.getDeletedAt());
-        verify(tripMemberRepository).save(target);
-    }
-
-    @Test
-    void removeMember_organizerRemovesSelf_throwsBadRequest() {
-        UUID tripId = UUID.randomUUID();
-        TripMember organizer = TripMember.builder().deviceId(deviceId).role(MemberRole.ORGANIZER).build();
-
-        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-                .thenReturn(Optional.of(organizer));
-
-        assertThrows(BadRequestException.class, () -> tripService.removeMember(tripId, deviceId, deviceId));
-    }
-
-    @Test
-    void removeMember_participantRemovesAnother_throwsAccessDenied() {
-        UUID tripId = UUID.randomUUID();
-        UUID targetId = UUID.randomUUID();
-        TripMember participant = TripMember.builder().deviceId(deviceId).role(MemberRole.PARTICIPANT).build();
-
-        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-                .thenReturn(Optional.of(participant));
-
-        assertThrows(AccessDeniedException.class, () -> tripService.removeMember(tripId, deviceId, targetId));
-    }
-
-    @Test
-    void removeMember_targetNotFound_throwsResourceNotFound() {
-        UUID tripId = UUID.randomUUID();
-        UUID targetId = UUID.randomUUID();
-        TripMember organizer = TripMember.builder().deviceId(deviceId).role(MemberRole.ORGANIZER).build();
-
-        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
-                .thenReturn(Optional.of(organizer));
-        when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, targetId))
-                .thenReturn(Optional.empty());
-
-        assertThrows(ResourceNotFoundException.class, () -> tripService.removeMember(tripId, deviceId, targetId));
-    }
-
-    @Test
-    void listTripResponsesForDevice_returnsMemberCount() {
-        UUID tripId = UUID.randomUUID();
-        Trip trip = Trip.builder().id(tripId).title("Test").status(TripStatus.PLANNING)
-                .createdBy(deviceId).referenceCurrency("EUR")
-                .createdAt(Instant.now()).updatedAt(Instant.now()).build();
-        TripMember member = TripMember.builder()
-                .deviceId(deviceId).displayName("Alice").role(MemberRole.ORGANIZER)
-                .joinedAt(Instant.now()).build();
-
-        when(tripRepository.findAllByMemberDeviceId(deviceId)).thenReturn(List.of(trip));
-        when(tripMemberRepository.countByTripIdAndDeletedAtIsNull(tripId))
-                .thenReturn(1L);
-
-        List<TripResponse> responses = tripService.listTripResponsesForDevice(deviceId);
-
-        assertEquals(1, responses.size());
-        assertEquals(1, responses.get(0).getMemberCount());
-        assertNotNull(responses.get(0).getMembers());
-        assertEquals(0, responses.get(0).getMembers().size());
-        assertEquals("Test", responses.get(0).getTitle());
+            assertThrows(ResourceNotFoundException.class, () -> tripService.removeMember(tripId, deviceId, targetId));
+        }
     }
 }
