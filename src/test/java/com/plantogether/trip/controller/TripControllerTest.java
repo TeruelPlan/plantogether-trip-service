@@ -53,10 +53,11 @@ class TripControllerTest {
                 .updatedAt(Instant.now())
                 .memberCount(1)
                 .members(List.of(TripMemberResponse.builder()
-                        .deviceId(deviceId)
+                        .id(UUID.randomUUID())
                         .displayName("Alice")
                         .role("ORGANIZER")
                         .joinedAt(Instant.now())
+                        .isMe(true)
                         .build()))
                 .build();
     }
@@ -146,7 +147,9 @@ class TripControllerTest {
                 .andExpect(jsonPath("$.title").value("Beach Trip"))
                 .andExpect(jsonPath("$.memberCount").value(1))
                 .andExpect(jsonPath("$.members").isArray())
-                .andExpect(jsonPath("$.members[0].deviceId").exists())
+                .andExpect(jsonPath("$.members[0].id").exists())
+                .andExpect(jsonPath("$.members[0].deviceId").doesNotExist())
+                .andExpect(jsonPath("$.members[0].isMe").value(true))
                 .andExpect(jsonPath("$.members[0].displayName").value("Alice"))
                 .andExpect(jsonPath("$.members[0].role").value("ORGANIZER"));
     }
@@ -257,7 +260,7 @@ class TripControllerTest {
         UUID tripId = UUID.randomUUID();
         List<TripMemberResponse> members = List.of(
                 TripMemberResponse.builder()
-                        .deviceId(deviceId).displayName("Alice").role("ORGANIZER").joinedAt(Instant.now()).build()
+                        .id(UUID.randomUUID()).displayName("Alice").role("ORGANIZER").joinedAt(Instant.now()).isMe(true).build()
         );
 
         when(tripService.getTripMembers(eq(tripId), any())).thenReturn(members);

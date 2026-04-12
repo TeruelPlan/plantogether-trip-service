@@ -53,7 +53,7 @@ class UserProfileControllerTest {
                         .header("X-Device-Id", deviceId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.displayName").value("Guest abc1"))
-                .andExpect(jsonPath("$.deviceId").exists());
+                .andExpect(jsonPath("$.deviceId").doesNotExist());
     }
 
     @Test

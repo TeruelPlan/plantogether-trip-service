@@ -1,5 +1,6 @@
 package com.plantogether.trip.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.plantogether.trip.domain.TripMember;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,17 +15,20 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TripMemberResponse {
-    private UUID deviceId;
+    private UUID id;
     private String displayName;
     private String role;
     private Instant joinedAt;
+    @JsonProperty("isMe")
+    private boolean isMe;
 
-    public static TripMemberResponse from(TripMember member) {
+    public static TripMemberResponse from(TripMember member, UUID currentDeviceId) {
         return TripMemberResponse.builder()
-                .deviceId(member.getDeviceId())
+                .id(member.getId())
                 .displayName(member.getDisplayName())
                 .role(member.getRole().name())
                 .joinedAt(member.getJoinedAt())
+                .isMe(member.getDeviceId().equals(currentDeviceId))
                 .build();
     }
 }

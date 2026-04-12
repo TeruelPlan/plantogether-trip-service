@@ -101,13 +101,13 @@ public class TripController {
         return ResponseEntity.ok(members);
     }
 
-    @DeleteMapping("/{id}/members/{deviceId}")
+    @DeleteMapping("/{id}/members/{memberId}")
     public ResponseEntity<Void> removeMember(
             Authentication authentication,
             @PathVariable UUID id,
-            @PathVariable("deviceId") UUID targetDeviceId) {
+            @PathVariable UUID memberId) {
         UUID callerDeviceId = UUID.fromString(authentication.getName());
-        tripService.removeMember(id, callerDeviceId, targetDeviceId);
+        tripService.removeMember(id, callerDeviceId, memberId);
         return ResponseEntity.noContent().build();
     }
 
