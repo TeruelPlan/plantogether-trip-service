@@ -162,7 +162,7 @@ public class TripService {
     }
 
     @Transactional
-    public Trip joinTrip(UUID tripId, UUID token, UUID deviceId) {
+    public TripResponse joinTrip(UUID tripId, UUID token, UUID deviceId) {
         TripInvitation invitation = tripInvitationRepository.findByToken(token)
                 .orElseThrow(() -> new ResourceNotFoundException("Invitation not found"));
 
@@ -175,7 +175,8 @@ public class TripService {
         }
 
         if (tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId).isPresent()) {
-            return invitation.getTrip();
+            List<TripMember> existingMembers = tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId);
+            return TripResponse.from(invitation.getTrip(), existingMembers);
         }
 
         UserProfile profile = userProfileRepository.findById(deviceId)
@@ -197,7 +198,7 @@ public class TripService {
         applicationEventPublisher.publishEvent(
                 new MemberJoinedInternalEvent(tripId, deviceId, member.getJoinedAt()));
 
-        return invitation.getTrip();
+        return TripResponse.from(invitation.getTrip());
     }
 
     @Transactional(readOnly = true)

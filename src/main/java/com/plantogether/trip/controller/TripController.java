@@ -1,6 +1,5 @@
 package com.plantogether.trip.controller;
 
-import com.plantogether.trip.domain.Trip;
 import com.plantogether.trip.dto.*;
 import com.plantogether.trip.service.InvitationService;
 import com.plantogether.trip.service.TripService;
@@ -113,12 +112,12 @@ public class TripController {
     }
 
     @PostMapping("/{id}/join")
-    public ResponseEntity<Trip> joinTrip(
+    public ResponseEntity<TripResponse> joinTrip(
             Authentication authentication,
             @PathVariable UUID id,
             @Valid @RequestBody JoinTripRequest request) {
         UUID deviceId = UUID.fromString(authentication.getName());
-        Trip trip = tripService.joinTrip(id, request.getToken(), deviceId);
+        TripResponse trip = tripService.joinTrip(id, request.getToken(), deviceId);
         return ResponseEntity.ok(trip);
     }
 }

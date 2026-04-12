@@ -4,6 +4,7 @@ import com.plantogether.common.exception.BadRequestException;
 import com.plantogether.common.exception.ResourceNotFoundException;
 import com.plantogether.trip.domain.*;
 import com.plantogether.trip.dto.TripPreviewResponse;
+import com.plantogether.trip.dto.TripResponse;
 import com.plantogether.trip.repository.TripInvitationRepository;
 import com.plantogether.trip.repository.TripMemberRepository;
 import com.plantogether.trip.repository.TripRepository;
@@ -80,7 +81,7 @@ class TripServiceJoinTest {
         when(userProfileRepository.findById(deviceId)).thenReturn(Optional.of(profile));
         when(tripMemberRepository.save(any(TripMember.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Trip result = tripService.joinTrip(tripId, token, deviceId);
+        TripResponse result = tripService.joinTrip(tripId, token, deviceId);
 
         assertEquals(tripId, result.getId());
         verify(tripMemberRepository).save(any(TripMember.class));
@@ -95,8 +96,9 @@ class TripServiceJoinTest {
         when(tripInvitationRepository.findByToken(token)).thenReturn(Optional.of(invitation));
         when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
                 .thenReturn(Optional.of(existing));
+        when(tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId)).thenReturn(java.util.List.of(existing));
 
-        Trip result = tripService.joinTrip(tripId, token, deviceId);
+        TripResponse result = tripService.joinTrip(tripId, token, deviceId);
 
         assertEquals(tripId, result.getId());
         verify(tripMemberRepository, never()).save(any());

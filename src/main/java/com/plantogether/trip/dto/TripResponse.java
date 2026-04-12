@@ -33,6 +33,9 @@ public class TripResponse {
 
     @Deprecated
     public static TripResponse from(Trip trip) {
+        List<TripMemberResponse> memberResponses = trip.getMembers().stream()
+                .map(TripMemberResponse::from)
+                .toList();
         return TripResponse.builder()
                 .id(trip.getId())
                 .title(trip.getTitle())
@@ -45,7 +48,7 @@ public class TripResponse {
                 .createdAt(trip.getCreatedAt())
                 .updatedAt(trip.getUpdatedAt())
                 .memberCount(0)
-                .members(List.of())
+                .members(memberResponses)
                 .build();
     }
 

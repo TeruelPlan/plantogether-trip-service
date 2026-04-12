@@ -31,7 +31,7 @@ public class TripMember {
     @Column(name = "device_id", nullable = false)
     private UUID deviceId;
 
-    @Column(name = "display_name", nullable = false, length = 255)
+    @Column(name = "display_name", nullable = false)
     private String displayName;
 
     @Enumerated(EnumType.STRING)

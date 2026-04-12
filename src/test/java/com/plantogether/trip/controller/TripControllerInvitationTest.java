@@ -4,10 +4,10 @@ import com.plantogether.common.exception.AccessDeniedException;
 import com.plantogether.common.exception.BadRequestException;
 import com.plantogether.common.exception.ResourceNotFoundException;
 import com.plantogether.common.security.SecurityAutoConfiguration;
-import com.plantogether.trip.domain.Trip;
 import com.plantogether.trip.domain.TripStatus;
 import com.plantogether.trip.dto.TripInvitationResponse;
 import com.plantogether.trip.dto.TripPreviewResponse;
+import com.plantogether.trip.dto.TripResponse;
 import com.plantogether.trip.service.InvitationService;
 import com.plantogether.trip.service.TripService;
 import org.junit.jupiter.api.AfterEach;
@@ -121,13 +121,13 @@ class TripControllerInvitationTest {
         UUID tripId = UUID.randomUUID();
         UUID token = UUID.randomUUID();
 
-        Trip trip = Trip.builder()
-                .id(tripId).title("Beach Trip").status(TripStatus.PLANNING)
+        TripResponse tripResponse = TripResponse.builder()
+                .id(tripId).title("Beach Trip").status(TripStatus.PLANNING.name())
                 .createdBy(UUID.randomUUID()).referenceCurrency("EUR")
                 .createdAt(Instant.now()).updatedAt(Instant.now())
                 .build();
 
-        when(tripService.joinTrip(eq(tripId), eq(token), any())).thenReturn(trip);
+        when(tripService.joinTrip(eq(tripId), eq(token), any())).thenReturn(tripResponse);
 
         mockMvc.perform(post("/api/v1/trips/{id}/join", tripId)
                         .header("X-Device-Id", deviceId.toString())
