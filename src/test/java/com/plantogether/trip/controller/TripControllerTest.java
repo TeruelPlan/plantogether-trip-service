@@ -9,6 +9,7 @@ import com.plantogether.trip.dto.UpdateTripRequest;
 import com.plantogether.trip.exception.TripStateException;
 import com.plantogether.trip.service.InvitationService;
 import com.plantogether.trip.service.TripService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -20,6 +21,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import org.mockito.Mockito;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -57,6 +59,11 @@ class TripControllerTest {
                         .joinedAt(Instant.now())
                         .build()))
                 .build();
+    }
+
+    @AfterEach
+    void tearDown() {
+        Mockito.reset(tripService, invitationService);
     }
 
     @Test
