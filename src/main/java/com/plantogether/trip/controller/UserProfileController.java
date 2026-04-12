@@ -39,7 +39,6 @@ public class UserProfileController {
 
     private UserProfileResponse toResponse(UserProfile p) {
         return UserProfileResponse.builder()
-                .deviceId(p.getDeviceId())
                 .displayName(p.getDisplayName())
                 .avatarUrl(p.getAvatarUrl())
                 .build();

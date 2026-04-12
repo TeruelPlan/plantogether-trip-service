@@ -31,30 +31,9 @@ public class TripResponse {
     private int memberCount;
     private List<TripMemberResponse> members;
 
-    @Deprecated
-    public static TripResponse from(Trip trip) {
-        List<TripMemberResponse> memberResponses = trip.getMembers().stream()
-                .map(TripMemberResponse::from)
-                .toList();
-        return TripResponse.builder()
-                .id(trip.getId())
-                .title(trip.getTitle())
-                .description(trip.getDescription())
-                .status(trip.getStatus().name())
-                .referenceCurrency(trip.getReferenceCurrency())
-                .startDate(trip.getStartDate())
-                .endDate(trip.getEndDate())
-                .createdBy(trip.getCreatedBy())
-                .createdAt(trip.getCreatedAt())
-                .updatedAt(trip.getUpdatedAt())
-                .memberCount(0)
-                .members(memberResponses)
-                .build();
-    }
-
-    public static TripResponse from(Trip trip, List<TripMember> members) {
+    public static TripResponse from(Trip trip, List<TripMember> members, UUID currentDeviceId) {
         List<TripMemberResponse> memberResponses = members.stream()
-                .map(TripMemberResponse::from)
+                .map(m -> TripMemberResponse.from(m, currentDeviceId))
                 .toList();
         return TripResponse.builder()
                 .id(trip.getId())

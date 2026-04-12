@@ -5,14 +5,11 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.UUID;
-
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserProfileResponse {
-    private UUID deviceId;
     private String displayName;
     private String avatarUrl;
 }

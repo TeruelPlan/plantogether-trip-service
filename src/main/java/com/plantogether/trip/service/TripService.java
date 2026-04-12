@@ -94,7 +94,7 @@ public class TripService {
         tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId)
                 .orElseThrow(() -> new AccessDeniedException("Not a member of this trip"));
         List<TripMember> members = tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId);
-        return TripResponse.from(trip, members);
+        return TripResponse.from(trip, members, deviceId);
     }
 
     @Transactional(readOnly = true)
@@ -140,7 +140,7 @@ public class TripService {
         trip = tripRepository.save(trip);
 
         List<TripMember> members = tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId);
-        return TripResponse.from(trip, members);
+        return TripResponse.from(trip, members, deviceId);
     }
 
     @Transactional
@@ -158,7 +158,7 @@ public class TripService {
         trip = tripRepository.save(trip);
 
         List<TripMember> members = tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId);
-        return TripResponse.from(trip, members);
+        return TripResponse.from(trip, members, deviceId);
     }
 
     @Transactional
@@ -176,7 +176,7 @@ public class TripService {
 
         if (tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId).isPresent()) {
             List<TripMember> existingMembers = tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId);
-            return TripResponse.from(invitation.getTrip(), existingMembers);
+            return TripResponse.from(invitation.getTrip(), existingMembers, deviceId);
         }
 
         UserProfile profile = userProfileRepository.findById(deviceId)
@@ -198,7 +198,8 @@ public class TripService {
         applicationEventPublisher.publishEvent(
                 new MemberJoinedInternalEvent(tripId, deviceId, member.getJoinedAt()));
 
-        return TripResponse.from(invitation.getTrip());
+        List<TripMember> allMembers = tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId);
+        return TripResponse.from(invitation.getTrip(), allMembers, deviceId);
     }
 
     @Transactional(readOnly = true)
@@ -234,19 +235,19 @@ public class TripService {
         tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId)
                 .orElseThrow(() -> new AccessDeniedException("Not a member of this trip"));
         return tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId).stream()
-                .map(TripMemberResponse::from)
+                .map(m -> TripMemberResponse.from(m, deviceId))
                 .toList();
     }
 
     @Transactional
-    public void removeMember(UUID tripId, UUID callerDeviceId, UUID targetDeviceId) {
+    public void removeMember(UUID tripId, UUID callerDeviceId, UUID memberId) {
         requireOrganizer(tripId, callerDeviceId);
-        if (callerDeviceId.equals(targetDeviceId)) {
+        TripMember target = tripMemberRepository
+                .findByIdAndTripIdAndDeletedAtIsNull(memberId, tripId)
+                .orElseThrow(() -> new ResourceNotFoundException("Member not found"));
+        if (target.getDeviceId().equals(callerDeviceId)) {
             throw new BadRequestException("Organizer cannot remove themselves");
         }
-        TripMember target = tripMemberRepository
-                .findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, targetDeviceId)
-                .orElseThrow(() -> new ResourceNotFoundException("Member not found"));
         if (target.getRole() == MemberRole.ORGANIZER) {
             throw new BadRequestException("Cannot remove another organizer");
         }
@@ -268,7 +269,7 @@ public class TripService {
     public TripResponse createTripWithResponse(UUID deviceId, String title, String description, String currency) {
         Trip trip = createTrip(deviceId, title, description, currency);
         List<TripMember> members = tripMemberRepository.findByTripIdAndDeletedAtIsNull(trip.getId());
-        return TripResponse.from(trip, members);
+        return TripResponse.from(trip, members, deviceId);
     }
 
     public record MemberJoinedInternalEvent(UUID tripId, UUID deviceId, Instant joinedAt) {
