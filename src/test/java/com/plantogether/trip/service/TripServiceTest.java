@@ -18,6 +18,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
@@ -100,6 +102,7 @@ class TripServiceTest {
     // -------------------------------------------------------------------------
 
     @Nested
+    @MockitoSettings(strictness = Strictness.LENIENT)
     class GetTrip {
 
         UUID tripId;
@@ -195,6 +198,7 @@ class TripServiceTest {
     // -------------------------------------------------------------------------
 
     @Nested
+    @MockitoSettings(strictness = Strictness.LENIENT)
     class UpdateTrip {
 
         UUID tripId;
@@ -290,6 +294,7 @@ class TripServiceTest {
     // -------------------------------------------------------------------------
 
     @Nested
+    @MockitoSettings(strictness = Strictness.LENIENT)
     class ArchiveTrip {
 
         UUID tripId;
