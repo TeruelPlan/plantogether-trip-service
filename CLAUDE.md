@@ -135,9 +135,9 @@ SmartLifecycle) — no grpc-spring-boot-starter.
 - `trip.created` — `TripCreatedEvent { tripId, name, organizerDeviceId, createdAt }`
 - `trip.member.joined` — `MemberJoinedEvent { tripId, deviceId, joinedAt }`
 
-**Consumes:**
+**Consumes** (durable queues bound to `plantogether.events`):
 
-- `poll.locked` — updates `trip.start_date` / `trip.end_date` from locked poll slot
+- queue `trip.poll-locked.queue` ← routing key `poll.locked` — `PollLockedListener` updates `Trip.startDate` / `Trip.endDate` to the winning slot's dates. Idempotent (same-dates no-op), skips soft-deleted and ARCHIVED trips, acks unknown / malformed tripId.
 
 ### Environment variables
 
