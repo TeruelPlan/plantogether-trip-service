@@ -13,11 +13,11 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class UpdateTripRequest {
 
-    @NotBlank(message = "Title is required")
-    private String title;
+  @NotBlank(message = "Title is required")
+  private String title;
 
-    private String description;
+  private String description;
 
-    @Pattern(regexp = "[A-Z]{3}", message = "Currency must be a 3-letter ISO 4217 code")
-    private String referenceCurrency;
+  @Pattern(regexp = "[A-Z]{3}", message = "Currency must be a 3-letter ISO 4217 code")
+  private String referenceCurrency;
 }
