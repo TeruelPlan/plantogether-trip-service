@@ -1,0 +1,12 @@
+spring:
+  jpa:
+    show-sql: false
+  flyway:
+    enabled: true
+
+grpc:
+  server:
+    port: 0
+
+app:
+  invite-base-url: http://localhost
