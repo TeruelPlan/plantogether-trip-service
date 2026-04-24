@@ -1,7 +1,7 @@
 package com.plantogether.trip.domain;
 
 public enum TripStatus {
-    PLANNING,
-    ACTIVE,
-    ARCHIVED
+  PLANNING,
+  ACTIVE,
+  ARCHIVED
 }

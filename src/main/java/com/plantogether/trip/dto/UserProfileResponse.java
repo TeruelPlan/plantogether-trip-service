@@ -10,6 +10,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserProfileResponse {
-    private String displayName;
-    private String avatarUrl;
+  private String displayName;
+  private String avatarUrl;
 }

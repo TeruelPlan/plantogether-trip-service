@@ -1,11 +1,10 @@
 package com.plantogether.trip.domain;
 
 import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.UuidGenerator;
-
 import java.time.Instant;
 import java.util.UUID;
+import lombok.*;
+import org.hibernate.annotations.UuidGenerator;
 
 @Entity
 @Table(name = "trip_invitation")
@@ -16,21 +15,21 @@ import java.util.UUID;
 @Builder
 public class TripInvitation {
 
-    @Id
-    @UuidGenerator(style = UuidGenerator.Style.TIME)
-    @Column(updatable = false, nullable = false)
-    private UUID id;
+  @Id
+  @UuidGenerator(style = UuidGenerator.Style.TIME)
+  @Column(updatable = false, nullable = false)
+  private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "trip_id", nullable = false)
-    private Trip trip;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "trip_id", nullable = false)
+  private Trip trip;
 
-    @Column(nullable = false, unique = true)
-    private UUID token;
+  @Column(nullable = false, unique = true)
+  private UUID token;
 
-    @Column(name = "created_by", nullable = false)
-    private UUID createdBy;
+  @Column(name = "created_by", nullable = false)
+  private UUID createdBy;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
+  @Column(name = "created_at", nullable = false)
+  private Instant createdAt;
 }

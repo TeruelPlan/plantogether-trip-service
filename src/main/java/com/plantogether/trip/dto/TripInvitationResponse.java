@@ -10,6 +10,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TripInvitationResponse {
-    private String inviteUrl;
-    private String token;
+  private String inviteUrl;
+  private String token;
 }

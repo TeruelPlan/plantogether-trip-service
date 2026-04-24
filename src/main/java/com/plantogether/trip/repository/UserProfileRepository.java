@@ -1,9 +1,7 @@
 package com.plantogether.trip.repository;
 
 import com.plantogether.trip.domain.UserProfile;
+import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.util.UUID;
-
-public interface UserProfileRepository extends JpaRepository<UserProfile, UUID> {
-}
+public interface UserProfileRepository extends JpaRepository<UserProfile, UUID> {}
