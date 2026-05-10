@@ -81,7 +81,7 @@ class TripServiceJoinTest {
             .build();
 
     when(tripInvitationRepository.findByToken(token)).thenReturn(Optional.of(invitation));
-    when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+    when(tripMemberRepository.findByTripIdAndDeviceId(tripId, deviceId))
         .thenReturn(Optional.empty());
     when(userProfileRepository.findById(deviceId)).thenReturn(Optional.of(profile));
     when(tripMemberRepository.save(any(TripMember.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -100,7 +100,7 @@ class TripServiceJoinTest {
         TripMember.builder().deviceId(deviceId).role(MemberRole.PARTICIPANT).build();
 
     when(tripInvitationRepository.findByToken(token)).thenReturn(Optional.of(invitation));
-    when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+    when(tripMemberRepository.findByTripIdAndDeviceId(tripId, deviceId))
         .thenReturn(Optional.of(existing));
     when(tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId))
         .thenReturn(java.util.List.of(existing));
@@ -132,7 +132,7 @@ class TripServiceJoinTest {
   @Test
   void joinTrip_noProfile_throws400() {
     when(tripInvitationRepository.findByToken(token)).thenReturn(Optional.of(invitation));
-    when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+    when(tripMemberRepository.findByTripIdAndDeviceId(tripId, deviceId))
         .thenReturn(Optional.empty());
     when(userProfileRepository.findById(deviceId)).thenReturn(Optional.empty());
 
@@ -145,7 +145,7 @@ class TripServiceJoinTest {
         UserProfile.builder().deviceId(deviceId).displayName(null).updatedAt(Instant.now()).build();
 
     when(tripInvitationRepository.findByToken(token)).thenReturn(Optional.of(invitation));
-    when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+    when(tripMemberRepository.findByTripIdAndDeviceId(tripId, deviceId))
         .thenReturn(Optional.empty());
     when(userProfileRepository.findById(deviceId)).thenReturn(Optional.of(profileNoName));
 

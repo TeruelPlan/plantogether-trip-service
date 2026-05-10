@@ -4,6 +4,7 @@ import com.plantogether.common.exception.AccessDeniedException;
 import com.plantogether.common.exception.BadRequestException;
 import com.plantogether.common.exception.ResourceNotFoundException;
 import com.plantogether.trip.domain.*;
+import com.plantogether.trip.dto.CurrentMemberResponse;
 import com.plantogether.trip.dto.TripMemberResponse;
 import com.plantogether.trip.dto.TripPreviewResponse;
 import com.plantogether.trip.dto.TripResponse;
@@ -15,6 +16,7 @@ import com.plantogether.trip.repository.TripRepository;
 import com.plantogether.trip.repository.UserProfileRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -191,9 +193,8 @@ public class TripService {
       throw new ResourceNotFoundException("Trip no longer exists: " + tripId);
     }
 
-    if (tripMemberRepository
-        .findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId)
-        .isPresent()) {
+    Optional<TripMember> existing = tripMemberRepository.findByTripIdAndDeviceId(tripId, deviceId);
+    if (existing.isPresent() && existing.get().getDeletedAt() == null) {
       List<TripMember> existingMembers =
           tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId);
       return TripResponse.from(invitation.getTrip(), existingMembers, deviceId);
@@ -208,14 +209,23 @@ public class TripService {
       throw new BadRequestException("Display name required");
     }
 
-    TripMember member =
-        TripMember.builder()
-            .trip(invitation.getTrip())
-            .deviceId(deviceId)
-            .displayName(profile.getDisplayName())
-            .role(MemberRole.PARTICIPANT)
-            .joinedAt(Instant.now())
-            .build();
+    TripMember member;
+    if (existing.isPresent()) {
+      // Revive the soft-deleted row to preserve trip_member.id stability across rejoins.
+      member = existing.get();
+      member.setDeletedAt(null);
+      member.setDisplayName(profile.getDisplayName());
+      member.setJoinedAt(Instant.now());
+    } else {
+      member =
+          TripMember.builder()
+              .trip(invitation.getTrip())
+              .deviceId(deviceId)
+              .displayName(profile.getDisplayName())
+              .role(MemberRole.PARTICIPANT)
+              .joinedAt(Instant.now())
+              .build();
+    }
     tripMemberRepository.save(member);
 
     applicationEventPublisher.publishEvent(
@@ -254,6 +264,15 @@ public class TripService {
         .memberCount(memberCount)
         .isMember(isMember)
         .build();
+  }
+
+  @Transactional(readOnly = true)
+  public CurrentMemberResponse getCurrentMember(UUID tripId, UUID deviceId) {
+    TripMember member =
+        tripMemberRepository
+            .findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId)
+            .orElseThrow(() -> new AccessDeniedException("Not a member of this trip"));
+    return CurrentMemberResponse.from(member);
   }
 
   @Transactional(readOnly = true)

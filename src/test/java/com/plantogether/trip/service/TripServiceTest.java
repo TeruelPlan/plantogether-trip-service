@@ -9,6 +9,7 @@ import com.plantogether.common.exception.AccessDeniedException;
 import com.plantogether.common.exception.BadRequestException;
 import com.plantogether.common.exception.ResourceNotFoundException;
 import com.plantogether.trip.domain.*;
+import com.plantogether.trip.dto.CurrentMemberResponse;
 import com.plantogether.trip.dto.TripMemberResponse;
 import com.plantogether.trip.dto.TripResponse;
 import com.plantogether.trip.dto.UpdateTripRequest;
@@ -499,6 +500,23 @@ class TripServiceTest {
       when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
           .thenReturn(Optional.empty());
       assertThrows(AccessDeniedException.class, () -> tripService.getTripMembers(tripId, deviceId));
+    }
+
+    @Test
+    void getCurrentMember_memberExists_returnsRef() {
+      CurrentMemberResponse result = tripService.getCurrentMember(tripId, deviceId);
+
+      assertEquals(organizer.getId(), result.tripMemberId());
+      assertEquals("Alice", result.displayName());
+      assertEquals("ORGANIZER", result.role());
+    }
+
+    @Test
+    void getCurrentMember_notMember_throwsAccessDenied() {
+      when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
+          .thenReturn(Optional.empty());
+      assertThrows(
+          AccessDeniedException.class, () -> tripService.getCurrentMember(tripId, deviceId));
     }
   }
 

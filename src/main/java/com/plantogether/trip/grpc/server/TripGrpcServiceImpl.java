@@ -36,6 +36,7 @@ public class TripGrpcServiceImpl extends TripServiceGrpc.TripServiceImplBase {
           IsMemberResponse.newBuilder()
               .setIsMember(member.isPresent())
               .setRole(member.map(m -> m.getRole().name()).orElse(""))
+              .setTripMemberId(member.map(m -> m.getId().toString()).orElse(""))
               .build());
       responseObserver.onCompleted();
     } catch (IllegalArgumentException e) {
@@ -69,6 +70,7 @@ public class TripGrpcServiceImpl extends TripServiceGrpc.TripServiceImplBase {
                                   .setDeviceId(m.getDeviceId().toString())
                                   .setRole(m.getRole().name())
                                   .setDisplayName(m.getDisplayName())
+                                  .setTripMemberId(m.getId().toString())
                                   .build())
                       .toList())
               .build();

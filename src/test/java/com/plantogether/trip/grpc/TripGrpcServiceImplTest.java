@@ -50,7 +50,12 @@ class TripGrpcServiceImplTest {
 
   @Test
   void isMember_memberExists_returnsTrue() {
-    TripMember member = TripMember.builder().deviceId(deviceId).role(MemberRole.ORGANIZER).build();
+    TripMember member =
+        TripMember.builder()
+            .id(UUID.randomUUID())
+            .deviceId(deviceId)
+            .role(MemberRole.ORGANIZER)
+            .build();
     when(tripMemberRepository.findByTripIdAndDeviceIdAndDeletedAtIsNull(tripId, deviceId))
         .thenReturn(Optional.of(member));
 
@@ -104,6 +109,7 @@ class TripGrpcServiceImplTest {
     when(tripRepository.findByIdAndDeletedAtIsNull(tripId)).thenReturn(Optional.of(trip));
     TripMember m1 =
         TripMember.builder()
+            .id(UUID.randomUUID())
             .deviceId(deviceId)
             .role(MemberRole.ORGANIZER)
             .displayName("Alice")
@@ -111,6 +117,7 @@ class TripGrpcServiceImplTest {
     UUID device2 = UUID.randomUUID();
     TripMember m2 =
         TripMember.builder()
+            .id(UUID.randomUUID())
             .deviceId(device2)
             .role(MemberRole.PARTICIPANT)
             .displayName("Bob")
