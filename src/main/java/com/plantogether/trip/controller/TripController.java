@@ -82,6 +82,14 @@ public class TripController {
     return ResponseEntity.ok(response);
   }
 
+  @GetMapping("/{id}/me")
+  public ResponseEntity<CurrentMemberResponse> getCurrentMember(
+      Authentication authentication, @PathVariable UUID id) {
+    UUID deviceId = UUID.fromString(authentication.getName());
+    CurrentMemberResponse response = tripService.getCurrentMember(id, deviceId);
+    return ResponseEntity.ok(response);
+  }
+
   @GetMapping("/{id}/members")
   public ResponseEntity<List<TripMemberResponse>> getMembers(
       Authentication authentication, @PathVariable UUID id) {

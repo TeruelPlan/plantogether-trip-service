@@ -37,7 +37,7 @@ public class TripEventPublisher {
     MemberJoinedEvent event =
         MemberJoinedEvent.builder()
             .tripId(internalEvent.tripId())
-            .deviceId(internalEvent.deviceId().toString())
+            .tripMemberId(internalEvent.tripMemberId().toString())
             .joinedAt(internalEvent.joinedAt())
             .build();
     rabbitTemplate.convertAndSend(
