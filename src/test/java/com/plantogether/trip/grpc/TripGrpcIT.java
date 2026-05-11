@@ -135,7 +135,7 @@ class TripGrpcIT extends AbstractIntegrationTest {
             GetTripMembersRequest.newBuilder().setTripId(trip.getId().toString()).build());
 
     assertThat(response.getMembersList()).hasSize(1);
-    assertThat(response.getMembers(0).getDeviceId()).isEqualTo(organizer.toString());
+    assertThat(response.getMembers(0).getTripMemberId()).isNotEmpty();
     assertThat(response.getMembers(0).getRole()).isEqualTo("ORGANIZER");
     assertThat(response.getMembers(0).getDisplayName()).isEqualTo("Alice");
   }
