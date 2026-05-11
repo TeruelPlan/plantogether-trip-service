@@ -67,7 +67,6 @@ public class TripGrpcServiceImpl extends TripServiceGrpc.TripServiceImplBase {
                       .map(
                           m ->
                               TripMemberProto.newBuilder()
-                                  .setDeviceId(m.getDeviceId().toString())
                                   .setRole(m.getRole().name())
                                   .setDisplayName(m.getDisplayName())
                                   .setTripMemberId(m.getId().toString())

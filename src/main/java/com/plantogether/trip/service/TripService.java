@@ -229,7 +229,7 @@ public class TripService {
     tripMemberRepository.save(member);
 
     applicationEventPublisher.publishEvent(
-        new MemberJoinedInternalEvent(tripId, deviceId, member.getJoinedAt()));
+        new MemberJoinedInternalEvent(tripId, member.getId(), member.getJoinedAt()));
 
     List<TripMember> allMembers = tripMemberRepository.findByTripIdAndDeletedAtIsNull(tripId);
     return TripResponse.from(invitation.getTrip(), allMembers, deviceId);
@@ -321,5 +321,5 @@ public class TripService {
     return TripResponse.from(trip, members, deviceId);
   }
 
-  public record MemberJoinedInternalEvent(UUID tripId, UUID deviceId, Instant joinedAt) {}
+  public record MemberJoinedInternalEvent(UUID tripId, UUID tripMemberId, Instant joinedAt) {}
 }
